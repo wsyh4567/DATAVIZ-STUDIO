@@ -1,0 +1,647 @@
+/* ═══════════════════════════════════════════════════════════
+   DataViz Studio — Component Styles
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── App Layout ──────────────────────────────────────── */
+.dvs-app {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: var(--topbar-height) 1fr var(--statusbar-height);
+    grid-template-areas:
+        "topbar  topbar"
+        "sidebar content"
+        "status  status";
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+/* ── Top Bar ─────────────────────────────────────────── */
+.dvs-topbar {
+    grid-area: topbar;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--sp-4);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    z-index: 100;
+    height: var(--topbar-height);
+}
+
+.dvs-topbar__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--text-md);
+    font-weight: 600;
+    color: var(--text-primary);
+    user-select: none;
+}
+
+.dvs-topbar__brand-icon {
+    font-size: var(--text-lg);
+}
+
+.dvs-topbar__brand-accent {
+    color: var(--accent);
+}
+
+.dvs-topbar__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+}
+
+.dvs-topbar__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--text-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.dvs-topbar__btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+.dvs-sidebar {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    width: var(--sidebar-width);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    padding: var(--sp-3) 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transition: width var(--transition-base);
+    z-index: 90;
+}
+
+.dvs-sidebar--collapsed {
+    width: var(--sidebar-collapsed);
+}
+
+.dvs-sidebar__item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-4);
+    margin: 1px var(--sp-2);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    text-decoration: none;
+    user-select: none;
+    min-height: 38px;
+}
+
+.dvs-sidebar__item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.dvs-sidebar__item--active {
+    background: var(--accent-light);
+    color: var(--accent-hover);
+}
+
+.dvs-sidebar__item--active:hover {
+    background: var(--accent-light);
+}
+
+.dvs-sidebar__icon {
+    flex-shrink: 0;
+    width: 24px;
+    text-align: center;
+    font-size: var(--text-md);
+}
+
+.dvs-sidebar__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity var(--transition-base);
+}
+
+.dvs-sidebar--collapsed .dvs-sidebar__label {
+    opacity: 0;
+    width: 0;
+}
+
+.dvs-sidebar__toggle {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-3);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: color var(--transition-fast);
+}
+
+.dvs-sidebar__toggle:hover {
+    color: var(--text-primary);
+}
+
+/* ── Content Area ────────────────────────────────────── */
+.dvs-content {
+    grid-area: content;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--sp-6);
+    background: var(--bg-primary);
+}
+
+/* ── Status Bar ──────────────────────────────────────── */
+.dvs-statusbar {
+    grid-area: status;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--sp-4);
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    height: var(--statusbar-height);
+    z-index: 100;
+}
+
+.dvs-statusbar__section {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+}
+
+.dvs-statusbar__item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+}
+
+.dvs-statusbar__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--success);
+}
+
+/* ── Card ────────────────────────────────────────────── */
+.dvs-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+    transition: border-color var(--transition-fast);
+}
+
+.dvs-card:hover {
+    border-color: var(--border-hover);
+}
+
+.dvs-card--accent {
+    border-left: 3px solid var(--accent);
+}
+
+/* ── Overview Stat Card ──────────────────────────────── */
+.dvs-stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4) var(--sp-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-width: 140px;
+    transition: all var(--transition-fast);
+}
+
+.dvs-stat-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+}
+
+.dvs-stat-card__label {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.dvs-stat-card__value {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dvs-stat-card__sub {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+/* ── Stats Row ───────────────────────────────────────── */
+.dvs-stats-row {
+    display: flex;
+    gap: var(--sp-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-6);
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+.dvs-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.dvs-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+}
+
+.dvs-btn--primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.dvs-btn--primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.dvs-btn--ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-secondary);
+}
+
+.dvs-btn--ghost:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.dvs-btn--sm {
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--text-xs);
+}
+
+.dvs-btn--danger {
+    background: var(--error);
+    border-color: var(--error);
+    color: #fff;
+}
+
+.dvs-btn--danger:hover {
+    filter: brightness(1.15);
+}
+
+/* ── Upload Zone ─────────────────────────────────────── */
+.dvs-upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--sp-12) var(--sp-8);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    background: var(--bg-secondary);
+}
+
+.dvs-upload-zone:hover,
+.dvs-upload-zone--active {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.dvs-upload-zone__icon {
+    font-size: 3rem;
+    margin-bottom: var(--sp-4);
+    opacity: 0.6;
+}
+
+.dvs-upload-zone__title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--sp-2);
+}
+
+.dvs-upload-zone__hint {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+/* ── Source Card (Welcome / Data Hub) ────────────────── */
+.dvs-source-cards {
+    display: flex;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-6);
+}
+
+.dvs-source-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-width: 100px;
+}
+
+.dvs-source-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+}
+
+.dvs-source-card__icon {
+    font-size: 1.8rem;
+}
+
+.dvs-source-card__label {
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.dvs-source-card--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dvs-source-card--disabled:hover {
+    transform: none;
+    border-color: var(--border);
+    box-shadow: none;
+}
+
+/* ── Dataset List Item ───────────────────────────────── */
+.dvs-dataset-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--sp-2);
+    transition: border-color var(--transition-fast);
+}
+
+.dvs-dataset-item:hover {
+    border-color: var(--border-hover);
+}
+
+.dvs-dataset-item--active {
+    border-left: 3px solid var(--accent);
+}
+
+.dvs-dataset-item__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dvs-dataset-item__name {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+}
+
+.dvs-dataset-item__meta {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.dvs-dataset-item__actions {
+    display: flex;
+    gap: var(--sp-2);
+}
+
+/* ── Section Header ──────────────────────────────────── */
+.dvs-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--sp-4);
+}
+
+.dvs-section-header__title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dvs-section-header__sub {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+/* ── Welcome Page Hero ───────────────────────────────── */
+.dvs-welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    padding: var(--sp-8);
+}
+
+.dvs-welcome__hero {
+    text-align: center;
+    margin-bottom: var(--sp-8);
+}
+
+.dvs-welcome__logo {
+    font-size: 3rem;
+    margin-bottom: var(--sp-3);
+}
+
+.dvs-welcome__title {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--sp-2);
+}
+
+.dvs-welcome__subtitle {
+    font-size: var(--text-md);
+    color: var(--text-secondary);
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.dvs-welcome__upload {
+    width: 100%;
+    max-width: 600px;
+    margin-bottom: var(--sp-8);
+}
+
+.dvs-welcome__samples {
+    width: 100%;
+    max-width: 600px;
+}
+
+.dvs-welcome__samples-title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--sp-3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dvs-sample-btns {
+    display: flex;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ── Page Title ──────────────────────────────────────── */
+.dvs-page-title {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--sp-6);
+}
+
+/* ── AG Grid Overrides ───────────────────────────────── */
+.ag-theme-alpine-dark {
+    --ag-background-color: var(--bg-secondary) !important;
+    --ag-header-background-color: var(--bg-tertiary) !important;
+    --ag-odd-row-background-color: var(--bg-secondary) !important;
+    --ag-row-hover-color: var(--bg-hover) !important;
+    --ag-border-color: var(--border) !important;
+    --ag-font-family: var(--font-sans) !important;
+    --ag-font-size: var(--text-sm) !important;
+    --ag-header-font-size: var(--text-xs) !important;
+    --ag-row-height: 36px;
+    --ag-header-height: 38px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+}
+
+/* ── Toast ────────────────────────────────────────────── */
+.dvs-toast-container {
+    position: fixed;
+    top: calc(var(--topbar-height) + var(--sp-3));
+    right: var(--sp-4);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.dvs-toast {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    min-width: 280px;
+    animation: dvs-slide-in 200ms ease;
+}
+
+.dvs-toast--success {
+    border-left: 3px solid var(--success);
+}
+
+.dvs-toast--warning {
+    border-left: 3px solid var(--warning);
+}
+
+.dvs-toast--error {
+    border-left: 3px solid var(--error);
+}
+
+.dvs-toast--info {
+    border-left: 3px solid var(--info);
+}
+
+@keyframes dvs-slide-in {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* ── Empty State ─────────────────────────────────────── */
+.dvs-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-12);
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.dvs-empty__icon {
+    font-size: 3rem;
+    margin-bottom: var(--sp-4);
+    opacity: 0.4;
+}
+
+.dvs-empty__text {
+    font-size: var(--text-md);
+    margin-bottom: var(--sp-2);
+}
+
+/* ── Badge ───────────────────────────────────────────── */
+.dvs-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--sp-2);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.dvs-badge--soon {
+    background: var(--warning-light);
+    color: var(--warning);
+}

@@ -1,0 +1,53 @@
+/* ═══════════════════════════════════════════════════════════
+   DataViz Studio — Themes
+   Light theme overrides (dark is default in base.css)
+   ═══════════════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+    /* Background */
+    --bg-primary: #F8FAFC;
+    --bg-secondary: #FFFFFF;
+    --bg-tertiary: #F1F5F9;
+    --bg-hover: #E2E8F0;
+    --bg-active: #CBD5E1;
+
+    /* Accent (keep the same Indigo) */
+    --accent: #4F46E5;
+    --accent-hover: #6366F1;
+    --accent-light: rgba(79, 70, 229, 0.08);
+    --accent-glow: rgba(79, 70, 229, 0.15);
+
+    /* Text */
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+
+    /* Semantic */
+    --success: #059669;
+    --success-light: rgba(5, 150, 105, 0.1);
+    --warning: #D97706;
+    --warning-light: rgba(217, 119, 6, 0.1);
+    --error: #DC2626;
+    --error-light: rgba(220, 38, 38, 0.1);
+    --info: #2563EB;
+    --info-light: rgba(37, 99, 235, 0.1);
+
+    /* Border */
+    --border: #E2E8F0;
+    --border-hover: #CBD5E1;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --shadow-glow: 0 0 20px var(--accent-glow);
+}
+
+/* Light theme scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: var(--border);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}

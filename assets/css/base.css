@@ -1,0 +1,166 @@
+/* ═══════════════════════════════════════════════════════════
+   DataViz Studio — Base CSS
+   CSS 变量 + 字体 + 重置 + 基础工具类
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Google Fonts ─────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ── CSS Variables (Dark theme — default) ────────────── */
+:root {
+    /* Background */
+    --bg-primary:     #0F1117;
+    --bg-secondary:   #1B1D2A;
+    --bg-tertiary:    #262940;
+    --bg-hover:       #2E3148;
+    --bg-active:      #363A56;
+
+    /* Accent */
+    --accent:         #6366F1;
+    --accent-hover:   #818CF8;
+    --accent-light:   rgba(99, 102, 241, 0.15);
+    --accent-glow:    rgba(99, 102, 241, 0.25);
+
+    /* Text */
+    --text-primary:   #F1F5F9;
+    --text-secondary: #94A3B8;
+    --text-muted:     #64748B;
+
+    /* Semantic */
+    --success:        #10B981;
+    --success-light:  rgba(16, 185, 129, 0.15);
+    --warning:        #F59E0B;
+    --warning-light:  rgba(245, 158, 11, 0.15);
+    --error:          #EF4444;
+    --error-light:    rgba(239, 68, 68, 0.15);
+    --info:           #3B82F6;
+    --info-light:     rgba(59, 130, 246, 0.15);
+
+    /* Border */
+    --border:         #2E3348;
+    --border-hover:   #404668;
+
+    /* Shadows (dark theme: subtle) */
+    --shadow-sm:      0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md:      0 4px 12px rgba(0,0,0,0.4);
+    --shadow-lg:      0 8px 24px rgba(0,0,0,0.5);
+    --shadow-glow:    0 0 20px var(--accent-glow);
+
+    /* Radius */
+    --radius-sm:      6px;
+    --radius-md:      8px;
+    --radius-lg:      12px;
+    --radius-xl:      16px;
+    --radius-full:    9999px;
+
+    /* Spacing */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    --sp-10: 40px;
+    --sp-12: 48px;
+
+    /* Typography */
+    --font-sans:    'Inter', -apple-system, 'Microsoft YaHei UI', 'Segoe UI', sans-serif;
+    --font-mono:    'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+
+    --text-xs:   0.75rem;    /* 12px */
+    --text-sm:   0.8125rem;  /* 13px */
+    --text-base: 0.875rem;   /* 14px */
+    --text-md:   1rem;       /* 16px */
+    --text-lg:   1.125rem;   /* 18px */
+    --text-xl:   1.25rem;    /* 20px */
+    --text-2xl:  1.5rem;     /* 24px */
+    --text-3xl:  1.875rem;   /* 30px */
+
+    /* Transition */
+    --transition-fast:   150ms ease;
+    --transition-base:   200ms ease;
+    --transition-slow:   300ms ease;
+
+    /* Layout */
+    --sidebar-width:     220px;
+    --sidebar-collapsed: 60px;
+    --topbar-height:     48px;
+    --statusbar-height:  28px;
+}
+
+/* ── Reset ────────────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    line-height: 1.5;
+    min-width: 1024px;
+    overflow: hidden;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+a:hover {
+    color: var(--accent-hover);
+}
+
+/* ── Scrollbar (dark theme) ──────────────────────────── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
+
+/* ── Utility classes ─────────────────────────────────── */
+.font-mono { font-family: var(--font-mono); }
+.text-muted { color: var(--text-muted); }
+.text-secondary { color: var(--text-secondary); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-error { color: var(--error); }
+.text-center { text-align: center; }
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.gap-1 { gap: var(--sp-1); }
+.gap-2 { gap: var(--sp-2); }
+.gap-3 { gap: var(--sp-3); }
+.gap-4 { gap: var(--sp-4); }
