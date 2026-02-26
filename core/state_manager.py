@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 状态管理器
 
 提供 dcc.Store 的初始化和全局状态结构。

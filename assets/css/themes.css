@@ -51,3 +51,55 @@
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
     background: var(--border-hover);
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   Glassmorphism Design Pattern
+   玻璃拟态效果 - 科技感视觉核心
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Base Glassmorphism Class ────────────────────────── */
+.dvs-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-glow-md);
+    transition: all var(--transition-slow);
+}
+
+.dvs-glass:hover {
+    border-color: var(--border-glow-hover);
+    box-shadow: var(--shadow-glow-lg);
+}
+
+/* ── Glassmorphism Fallback (不支持backdrop-filter) ── */
+@supports not (backdrop-filter: blur(12px)) {
+    .dvs-glass {
+        background: rgba(15, 23, 42, 0.95);
+    }
+}
+
+/* ── Glassmorphism Variants ──────────────────────────── */
+.dvs-glass--subtle {
+    background: rgba(15, 23, 42, 0.5);
+    border-color: rgba(14, 165, 233, 0.2);
+    box-shadow: var(--shadow-glow-sm);
+}
+
+.dvs-glass--strong {
+    background: rgba(15, 23, 42, 0.85);
+    border-color: rgba(14, 165, 233, 0.4);
+    box-shadow: var(--shadow-glow-lg);
+}
+
+.dvs-glass--accent {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+}
+
+.dvs-glass--accent:hover {
+    border-color: var(--accent-hover);
+    box-shadow: 0 0 25px rgba(14, 165, 233, 0.4);
+}

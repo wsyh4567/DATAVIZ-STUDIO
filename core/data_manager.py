@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 数据管理器
 
 管理多个 DataFrame 实例，提供活跃数据集追踪和 undo/redo 功能。
@@ -99,6 +100,19 @@ class DataManager:
     @property
     def active_df(self) -> Optional[pd.DataFrame]:
         return self.get_dataset()
+
+    @active_df.setter
+    def active_df(self, df: pd.DataFrame) -> None:
+        """更新活跃数据集"""
+        if self._active and self._active in self._datasets:
+            self._datasets[self._active] = df
+
+    def update_active_dataset(self, df: pd.DataFrame, snapshot: bool = True) -> None:
+        """更新活跃数据集，可选择是否保存快照"""
+        if snapshot and self._active:
+            self.snapshot(f"Update {self._active}")
+        if self._active and self._active in self._datasets:
+            self._datasets[self._active] = df
 
     # ── Metadata ──────────────────────────────────────
 

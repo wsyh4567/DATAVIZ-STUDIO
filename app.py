@@ -1,9 +1,16 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 应用入口
 
 Dash SPA 应用：顶栏 + 侧边栏 + 路由 + 状态栏 + 全局状态。
 """
 
 from __future__ import annotations
+import sys
+import io
+
+# 设置标准输出编码为 UTF-8
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import dash
 from dash import Dash, html, dcc, Input, Output, State, callback, no_update
@@ -16,6 +23,14 @@ from components.navbar import create_navbar
 from components.sidebar import create_sidebar
 from components.statusbar import create_statusbar
 from utils.helpers import format_number
+
+# Import page modules to register their callbacks
+import pages.welcome
+import pages.data_hub
+import pages.data_canvas
+import pages.chart_studio
+import pages.data_workshop
+import pages.statistics_lab
 
 # ── 初始化 Dash 应用 ──────────────────────────────────
 
@@ -64,39 +79,67 @@ app.layout = html.Div(
 )
 def route_page(pathname: str):
     """根据 URL 渲染对应页面。"""
-    # Lazy imports to avoid circular deps
-    from pages.welcome import create_welcome_page
-    from pages.data_hub import create_data_hub_page
-    from pages.data_canvas import create_data_canvas_page
+    print(f"[DEBUG] route_page called with pathname: {pathname}")
+    
+    try:
+        # Lazy imports to avoid circular deps
+        from pages.welcome import create_welcome_page
+        from pages.data_hub import create_data_hub_page
+        from pages.data_canvas import create_data_canvas_page
+        from pages.chart_studio import create_chart_studio_page
+        from pages.data_workshop import layout as data_workshop_layout
+        from pages.statistics_lab import layout as statistics_lab_layout
 
-    if pathname == "/canvas":
-        return create_data_canvas_page()
-    elif pathname == "/data":
-        return create_data_hub_page()
-    elif pathname in ("/workshop", "/charts", "/stats", "/dashboard", "/advanced"):
-        # Placeholder pages for Phase 2+
-        labels = {
-            "/workshop": ("🧹", "数据工坊"),
-            "/charts":   ("📈", "图表工作室"),
-            "/stats":    ("🧮", "统计实验室"),
-            "/dashboard":("📋", "仪表盘"),
-            "/advanced": ("⚡", "高级工具"),
-        }
-        icon, name = labels[pathname]
+        if pathname == "/canvas":
+            print(f"[DEBUG] Routing to canvas page")
+            return create_data_canvas_page()
+        elif pathname == "/data":
+            print(f"[DEBUG] Routing to data hub page")
+            return create_data_hub_page()
+        elif pathname == "/charts":
+            print(f"[DEBUG] Routing to chart studio page")
+            return create_chart_studio_page()
+        elif pathname == "/workshop":
+            print(f"[DEBUG] Routing to data workshop page")
+            return data_workshop_layout()
+        elif pathname == "/stats":
+            print(f"[DEBUG] Routing to statistics lab page")
+            return statistics_lab_layout()
+        elif pathname in ("/dashboard", "/advanced"):
+            # Placeholder pages for Phase 4+
+            labels = {
+                "/dashboard":("📋", "仪表盘"),
+                "/advanced": ("⚡", "高级工具"),
+            }
+            icon, name = labels[pathname]
+            print(f"[DEBUG] Routing to placeholder page: {name}")
+            return html.Div(
+                className="dvs-empty",
+                style={"minHeight": "60vh"},
+                children=[
+                    html.Div(icon, className="dvs-empty__icon"),
+                    html.Div(f"{name} — 即将推出", className="dvs-empty__text"),
+                    html.Div("该功能将在后续版本中实现", style={
+                        "color": "var(--text-muted)", "fontSize": "var(--text-sm)"
+                    }),
+                ],
+            )
+        else:
+            # Default: welcome page
+            print(f"[DEBUG] Routing to welcome page (default)")
+            return create_welcome_page()
+    except Exception as e:
+        print(f"[ERROR] Exception in route_page: {e}")
+        import traceback
+        traceback.print_exc()
         return html.Div(
             className="dvs-empty",
-            style={"minHeight": "60vh"},
             children=[
-                html.Div(icon, className="dvs-empty__icon"),
-                html.Div(f"{name} — 即将推出", className="dvs-empty__text"),
-                html.Div("该功能将在后续版本中实现", style={
-                    "color": "var(--text-muted)", "fontSize": "var(--text-sm)"
-                }),
+                html.Div("⚠️", className="dvs-empty__icon"),
+                html.Div("页面加载出错", className="dvs-empty__text"),
+                html.Div(f"错误：{str(e)}", style={"color": "var(--error)", "fontSize": "var(--text-sm)"}),
             ],
         )
-    else:
-        # Default: welcome page
-        return create_welcome_page()
 
 
 # ── 侧边栏高亮 ────────────────────────────────────────
@@ -137,22 +180,43 @@ def update_sidebar_active(pathname: str):
 
 # ── 侧边栏折叠 ────────────────────────────────────────
 
-@callback(
+# 使用clientside callback实现状态持久化
+app.clientside_callback(
+    """
+    function(n_clicks, current_class) {
+        if (!n_clicks) {
+            // 初始加载：从sessionStorage恢复状态
+            try {
+                const saved = sessionStorage.getItem('sidebar-collapsed');
+                if (saved === 'true') {
+                    return ['dvs-sidebar dvs-sidebar--collapsed', '▶'];
+                }
+            } catch (e) {
+                console.warn('SessionStorage unavailable:', e);
+            }
+            return window.dash_clientside.no_update;
+        }
+        
+        // 切换状态
+        const collapsed = (current_class || '').includes('dvs-sidebar--collapsed');
+        const newClass = collapsed ? 'dvs-sidebar' : 'dvs-sidebar dvs-sidebar--collapsed';
+        const newIcon = collapsed ? '◀' : '▶';
+        
+        // 保存到sessionStorage
+        try {
+            sessionStorage.setItem('sidebar-collapsed', (!collapsed).toString());
+        } catch (e) {
+            console.warn('SessionStorage unavailable:', e);
+        }
+        
+        return [newClass, newIcon];
+    }
+    """,
     Output("sidebar", "className"),
     Output("sidebar-toggle-icon", "children"),
     Input("sidebar-toggle", "n_clicks"),
     State("sidebar", "className"),
-    prevent_initial_call=True,
 )
-def toggle_sidebar(n_clicks, current_class):
-    """切换侧边栏折叠状态。"""
-    if n_clicks is None:
-        return no_update, no_update
-    collapsed = "dvs-sidebar--collapsed" in (current_class or "")
-    if collapsed:
-        return "dvs-sidebar", "◀"
-    else:
-        return "dvs-sidebar dvs-sidebar--collapsed", "▶"
 
 
 # ── 主题切换 ───────────────────────────────────────────
@@ -221,6 +285,8 @@ def show_toast(store_data):
 # ── 启动 ──────────────────────────────────────────────
 
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
     app.run(
         host=config.HOST,
         port=config.PORT,

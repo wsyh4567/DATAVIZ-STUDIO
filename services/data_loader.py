@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 数据加载服务
 
 支持 CSV / Excel / JSON 以及内置示例数据集。

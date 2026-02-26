@@ -67,14 +67,18 @@ dataviz-studio
 - [x] 数据表格预览（AG Grid）
 - [x] 数据概览卡片
 
-### 🚧 Phase 2 — 核心体验（进行中）
+### ✅ Phase 2 — 核心体验（已完成）
 
-- [ ] 图表工作室（拖拽式，10+ 图表类型）
-- [ ] 智能图表推荐
-- [ ] 样式配置面板
-- [ ] 图表导出
+- [x] 图表工作室（拖拽式，15 种图表类型）
+- [x] 智能图表推荐
+- [x] 样式配置面板（4种主题 + 7种配色）
+- [x] 图表导出（PNG / HTML）
+- [x] 字段自动分类（度量 vs 维度）
+- [x] 实时图表预览
 
-### 📅 Phase 3 — 分析能力
+**详细报告**：查看 [docs/PHASE2_COMPLETION.md](docs/PHASE2_COMPLETION.md)
+
+### 🚧 Phase 3 — 分析能力（进行中）
 
 - [ ] 数据清洗面板 + 操作流水线
 - [ ] 描述性统计 + 相关性分析
@@ -123,9 +127,16 @@ dataviz-studio/
 │   ├── base.css            # 基础样式 + CSS 变量
 │   ├── components.css      # 组件样式
 │   └── themes.css          # 主题切换
-└── utils/                  # 工具函数
-    ├── helpers.py
-    └── i18n.py             # 国际化
+├── utils/                  # 工具函数
+│   ├── helpers.py
+│   └── i18n.py             # 国际化
+├── tests/                  # 测试脚本
+│   └── README.md           # 测试说明
+└── docs/                   # 项目文档
+    ├── archive/            # 历史文档归档
+    ├── GETTING_STARTED.md
+    ├── FRONTEND_REVIEW.md
+    └── task.md
 ```
 
 ---

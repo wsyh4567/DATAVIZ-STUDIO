@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 全局配置"""
 
 from pathlib import Path

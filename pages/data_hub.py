@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 数据中心页
 
 数据源卡片 + 上传区域 + 已加载数据集列表。
@@ -84,6 +85,7 @@ def create_data_hub_page() -> html.Div:
 
 @callback(
     Output("app-store", "data", allow_duplicate=True),
+    Output("url", "pathname", allow_duplicate=True),
     Input("datahub-upload", "contents"),
     State("datahub-upload", "filename"),
     State("app-store", "data"),
@@ -91,16 +93,24 @@ def create_data_hub_page() -> html.Div:
 )
 def on_datahub_upload(contents, filename, store_data):
     """数据中心文件上传。"""
+    print(f"[DEBUG] on_datahub_upload called: filename={filename}")
+    
     if contents is None or filename is None:
-        return no_update
+        print(f"[DEBUG] contents or filename is None, returning no_update")
+        return no_update, no_update
 
     try:
+        print(f"[DEBUG] Decoding file content...")
         content_type, content_string = contents.split(",")
         decoded = base64.b64decode(content_string)
 
+        print(f"[DEBUG] Loading file...")
         dm = DataManager()
         df = load_file(decoded, filename)
+        print(f"[DEBUG] File loaded: {len(df)} rows × {len(df.columns)} columns")
+        
         name = dm.add_dataset(filename, df, source=f"file:{filename}")
+        print(f"[DEBUG] Dataset added: {name}")
 
         store_data = store_data or {}
         store_data["active_dataset"] = name
@@ -109,11 +119,15 @@ def on_datahub_upload(contents, filename, store_data):
             "message": f"✅ 已加载 {name}（{len(df)} 行 × {len(df.columns)} 列）",
             "type": "success",
         }
-        return store_data
+        print(f"[DEBUG] Redirecting to /canvas")
+        return store_data, "/canvas"
     except Exception as e:
+        print(f"[ERROR] Upload failed: {e}")
+        import traceback
+        traceback.print_exc()
         store_data = store_data or {}
         store_data["toast"] = {"message": f"❌ 加载失败：{str(e)}", "type": "error"}
-        return store_data
+        return store_data, no_update
 
 
 @callback(

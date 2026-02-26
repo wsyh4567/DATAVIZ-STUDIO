@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 欢迎页
 
 中央拖拽上传 + 示例数据集快速体验。

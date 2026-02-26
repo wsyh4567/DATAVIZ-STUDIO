@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 简单功能测试
 
 验证核心功能是否正常工作。
@@ -6,11 +7,15 @@
 from __future__ import annotations
 
 import sys
+import io
+
+# 设置标准输出为 UTF-8 编码
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
 def test_imports():
     """测试所有依赖是否正确安装。"""
-    print("🧪 测试 1：检查依赖...")
+    print("测试 1：检查依赖...")
     try:
         import dash
         import dash_bootstrap_components
@@ -20,16 +25,16 @@ def test_imports():
         import openpyxl
         import chardet
         import numpy
-        print("  ✅ 所有依赖已安装")
+        print("  [OK] 所有依赖已安装")
         return True
     except ImportError as e:
-        print(f"  ❌ 依赖缺失：{e}")
+        print(f"  [FAIL] 依赖缺失：{e}")
         return False
 
 
 def test_app_structure():
     """测试应用结构是否完整。"""
-    print("\n🧪 测试 2：检查应用结构...")
+    print("\n测试 2：检查应用结构...")
     try:
         from app import app, server
         from core.data_manager import DataManager
@@ -42,16 +47,16 @@ def test_app_structure():
         from pages.welcome import create_welcome_page
         from pages.data_hub import create_data_hub_page
         from pages.data_canvas import create_data_canvas_page
-        print("  ✅ 应用结构完整")
+        print("  [OK] 应用结构完整")
         return True
     except ImportError as e:
-        print(f"  ❌ 模块导入失败：{e}")
+        print(f"  [FAIL] 模块导入失败：{e}")
         return False
 
 
 def test_data_manager():
     """测试数据管理器功能。"""
-    print("\n🧪 测试 3：测试数据管理器...")
+    print("\n测试 3：测试数据管理器...")
     try:
         from core.data_manager import DataManager
         import pandas as pd
@@ -76,16 +81,16 @@ def test_data_manager():
         assert len(datasets) == 1, f"数据集数量错误：{len(datasets)}"
 
         dm.clear()
-        print("  ✅ 数据管理器功能正常")
+        print("  [OK] 数据管理器功能正常")
         return True
     except Exception as e:
-        print(f"  ❌ 数据管理器测试失败：{e}")
+        print(f"  [FAIL] 数据管理器测试失败：{e}")
         return False
 
 
 def test_data_loader():
     """测试数据加载功能。"""
-    print("\n🧪 测试 4：测试数据加载...")
+    print("\n测试 4：测试数据加载...")
     try:
         from services.data_loader import load_sample_dataset, SAMPLE_DATASETS
 
@@ -94,18 +99,18 @@ def test_data_loader():
             df = load_sample_dataset(name)
             assert df is not None, f"{name} 加载失败"
             assert len(df) > 0, f"{name} 数据为空"
-            print(f"  ✅ {name}: {len(df)} 行 × {len(df.columns)} 列")
+            print(f"  [OK] {name}: {len(df)} 行 × {len(df.columns)} 列")
 
-        print("  ✅ 数据加载功能正常")
+        print("  [OK] 数据加载功能正常")
         return True
     except Exception as e:
-        print(f"  ❌ 数据加载测试失败：{e}")
+        print(f"  [FAIL] 数据加载测试失败：{e}")
         return False
 
 
 def test_components():
     """测试组件创建。"""
-    print("\n🧪 测试 5：测试组件创建...")
+    print("\n测试 5：测试组件创建...")
     try:
         from components.navbar import create_navbar
         from components.sidebar import create_sidebar
@@ -131,16 +136,16 @@ def test_components():
         table = create_data_table(df)
         assert table is not None, "数据表格创建失败"
 
-        print("  ✅ 组件创建功能正常")
+        print("  [OK] 组件创建功能正常")
         return True
     except Exception as e:
-        print(f"  ❌ 组件测试失败：{e}")
+        print(f"  [FAIL] 组件测试失败：{e}")
         return False
 
 
 def test_pages():
     """测试页面创建。"""
-    print("\n🧪 测试 6：测试页面创建...")
+    print("\n测试 6：测试页面创建...")
     try:
         from pages.welcome import create_welcome_page
         from pages.data_hub import create_data_hub_page
@@ -155,10 +160,10 @@ def test_pages():
         canvas = create_data_canvas_page()
         assert canvas is not None, "数据画布页创建失败"
 
-        print("  ✅ 页面创建功能正常")
+        print("  [OK] 页面创建功能正常")
         return True
     except Exception as e:
-        print(f"  ❌ 页面测试失败：{e}")
+        print(f"  [FAIL] 页面测试失败：{e}")
         return False
 
 
@@ -186,14 +191,14 @@ def main():
     print("=" * 60)
 
     if all(results):
-        print("\n🎉 所有测试通过！应用已准备就绪。")
+        print("\n所有测试通过！应用已准备就绪。")
         print("\n启动应用：")
         print("  python app.py")
         print("  或")
         print("  python cli.py")
         return 0
     else:
-        print("\n⚠️ 部分测试失败，请检查错误信息。")
+        print("\n部分测试失败，请检查错误信息。")
         return 1
 
 

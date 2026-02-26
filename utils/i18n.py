@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 国际化（i18n）
 
 简易中英文切换，Phase 1 仅提供中文。

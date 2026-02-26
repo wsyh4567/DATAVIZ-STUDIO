@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 顶部导航栏组件"""
 
 from __future__ import annotations

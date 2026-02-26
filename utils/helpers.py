@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DataViz Studio — 工具函数"""
 
 from __future__ import annotations
