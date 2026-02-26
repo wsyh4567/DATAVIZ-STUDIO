@@ -1176,78 +1176,80 @@
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
 }
 
-/* ── Chart Type Selector ─────────────────────────────── */
-.chart-type-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+/* ── Field Config Row (FineBI Style) ──────────────────── */
+.field-config-row {
+    display: flex;
     gap: var(--sp-3);
-    padding: var(--sp-3);
+    align-items: flex-start;
+    flex-wrap: wrap;
 }
 
-.chart-type-card {
-    background: var(--bg-tertiary);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--sp-4);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    text-align: center;
-}
-
-.chart-type-card:hover {
-    border-color: var(--accent);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-glow);
-}
-
-.chart-type-card.active {
-    border-color: var(--accent);
-    background: var(--accent-light);
-    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-}
-
-.chart-type-card.disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.chart-type-card.disabled:hover {
-    transform: none;
-    border-color: var(--border);
-    box-shadow: none;
-}
-
-.chart-type-card-inner {
+.field-config-item {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    gap: var(--sp-1);
+    flex: 1;
+    min-width: 120px;
+}
+
+.field-config-label {
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0;
+}
+
+.drop-zone-compact {
+    min-height: 40px;
+    padding: var(--sp-2);
+    font-size: var(--text-sm);
+}
+
+/* ── Compact Chart Type Selector ─────────────────────── */
+.chart-type-list {
+    display: flex;
+    flex-direction: column;
     gap: var(--sp-2);
 }
 
-.chart-type-name {
-    font-size: var(--text-xs);
-    font-weight: 500;
-    color: var(--text-secondary);
-}
-
-.chart-category-tabs .nav-link {
-    color: var(--text-secondary);
-    border: none;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-    padding: var(--sp-2) var(--sp-4);
+.chart-type-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
     transition: all var(--transition-fast);
 }
 
-.chart-category-tabs .nav-link:hover {
-    color: var(--text-primary);
-    border-bottom-color: var(--accent);
+.chart-type-btn:hover {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+    transform: translateX(2px);
 }
 
-.chart-category-tabs .nav-link.active {
+.chart-type-btn.active {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+.chart-type-label {
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    color: var(--text-secondary);
+}
+
+.chart-type-btn:hover .chart-type-label {
+    color: var(--text-primary);
+}
+
+.chart-type-btn.active .chart-type-label {
     color: var(--accent);
-    border-bottom-color: var(--accent);
-    background: transparent;
 }
 
 /* ── Chart Canvas ────────────────────────────────────── */

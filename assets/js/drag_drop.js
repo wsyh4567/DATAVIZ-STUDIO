@@ -117,31 +117,66 @@ function removeField(zoneId) {
 document.addEventListener('fieldDropped', function(e) {
     const { field, zone, category } = e.detail;
     
+    console.log('[Drag&Drop] Field dropped:', field, 'to zone:', zone);
+    
     // 获取当前字段映射
     const storeElement = document.getElementById('chart-fields-store');
     if (storeElement) {
-        const currentData = JSON.parse(storeElement.dataset.data || '{}');
+        // 从 data 属性或 children 中获取当前数据
+        let currentData = {};
+        try {
+            const dataAttr = storeElement.getAttribute('data-data');
+            if (dataAttr) {
+                currentData = JSON.parse(dataAttr);
+            }
+        } catch (e) {
+            console.warn('[Drag&Drop] Failed to parse current data:', e);
+        }
+        
+        // 更新字段映射
         currentData[zone] = field;
         
-        // 更新 store（触发 Dash 回调）
-        if (window.dash_clientside) {
+        console.log('[Drag&Drop] Updated fields:', currentData);
+        
+        // 触发 Dash 回调 - 使用 Dash 的 setProps 方法
+        if (window.dash_clientside && window.dash_clientside.set_props) {
             window.dash_clientside.set_props('chart-fields-store', { data: currentData });
+            console.log('[Drag&Drop] Triggered Dash callback');
+        } else {
+            console.error('[Drag&Drop] dash_clientside not available');
         }
+    } else {
+        console.error('[Drag&Drop] chart-fields-store element not found');
     }
 });
 
 document.addEventListener('fieldRemoved', function(e) {
     const { zone } = e.detail;
     
+    console.log('[Drag&Drop] Field removed from zone:', zone);
+    
     // 获取当前字段映射
     const storeElement = document.getElementById('chart-fields-store');
     if (storeElement) {
-        const currentData = JSON.parse(storeElement.dataset.data || '{}');
+        let currentData = {};
+        try {
+            const dataAttr = storeElement.getAttribute('data-data');
+            if (dataAttr) {
+                currentData = JSON.parse(dataAttr);
+            }
+        } catch (e) {
+            console.warn('[Drag&Drop] Failed to parse current data:', e);
+        }
+        
+        // 删除字段
         delete currentData[zone];
         
-        // 更新 store（触发 Dash 回调）
-        if (window.dash_clientside) {
+        console.log('[Drag&Drop] Updated fields after removal:', currentData);
+        
+        // 触发 Dash 回调
+        if (window.dash_clientside && window.dash_clientside.set_props) {
             window.dash_clientside.set_props('chart-fields-store', { data: currentData });
+            console.log('[Drag&Drop] Triggered Dash callback');
         }
     }
 });
