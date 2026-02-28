@@ -190,18 +190,29 @@
 ```
 构建数据工坊 —— 全程 GUI 的数据清洗和转换中心。
 
+**最新功能增强（2026-02）**:
+- 列拆分：支持多种分隔符（逗号、空格、分号、竖线、自定义）
+- 列合并：将多列合并为一列，可选择删除原列
+- 查找替换：支持精确匹配和正则表达式
+- 字符串清理：去空格、大小写转换、子字符串提取
+- 数值分箱：等宽、等频、自定义边界分箱
+- 标准化归一化：Z-score、Min-Max、鲁棒缩放
+- 滚动窗口：滚动平均、求和、标准差、指数平滑
+- 累积函数：累积和、累积积、累积最大/最小值
+
 界面布局：
 ┌────────────────┬────────────────────┬──────────────┐
 │  操作菜单       │   数据预览          │ 操作流水线    │
 │  (分类列表)     │   (实时显示效果)    │ (操作历史)    │
 │                │                    │              │
-│ ▸ 列操作       │                    │ ① 删除列 age │
+│ ▸ 列操作       │                    │ ① 列拆分     │
 │ ▸ 缺失值       │   > 应用前可预览 <  │ ② 填充缺失值  │
 │ ▸ 类型转换      │   > 变化高亮显示 <  │ ③ 类型转换    │
-│ ▸ 筛选排序      │                    │ ④ ...       │
-│ ▸ 文本处理      │                    │              │
-│ ▸ 数值处理      │                    │ [撤销] [重做] │
-│ ▸ 计算列       │                    │ [导出脚本]    │
+│ ▸ 筛选排序      │                    │ ④ 数值分箱    │
+│ ▸ 文本处理      │                    │ ⑤ 标准化     │
+│ ▸ 数值处理      │                    │              │
+│ ▸ 计算列       │                    │ [撤销] [重做] │
+│                │                    │ [导出脚本]    │
 └────────────────┴────────────────────┴──────────────┘
 
 操作分类（每个操作都是一个 GUI 表单，绝不需要写代码）：
@@ -210,7 +221,7 @@
   - 删除列：勾选多列 → 点"删除"
   - 重命名：点击列名直接编辑
   - 调序：拖拽排序
-  - 拆分列：选列 → 选分隔符 → 预览 → 确认
+  - 拆分列：选列 → 选分隔符（逗号/空格/分号/竖线/自定义）→ 预览 → 确认
   - 合并列：选多列 → 设分隔符 → 新列名 → 确认
 
 缺失值处理：
@@ -239,13 +250,28 @@
 
 文本处理（字符串列）：
   - 去空格 / 转大写 / 转小写 / 首字母大写
-  - 查找替换（支持正则）
+  - 查找替换（支持正则表达式）
   - 提取模式（正则提取 + 可视化说明）
   - 文本分列
 
 数值处理：
-  - 分箱/离散化（等宽/等频/自定义边界）
-  - 标准化 / 归一化
+  - 分箱/离散化：
+    ├── 等宽分箱（Equal Width）
+    ├── 等频分箱（Equal Frequency）
+    └── 自定义边界分箱
+  - 标准化/归一化：
+    ├── Z-score 标准化
+    ├── Min-Max 归一化（可指定范围）
+    └── 鲁棒缩放（使用中位数和四分位距）
+  - 滚动窗口函数：
+    ├── 滚动平均（rolling mean）
+    ├── 滚动求和（rolling sum）
+    ├── 滚动标准差（rolling std）
+    └── 指数平滑（exponential smoothing）
+  - 累积函数：
+    ├── 累积和（cumsum）
+    ├── 累积积（cumprod）
+    └── 累积最大/最小值（cummax/cummin）
   - 取对数 / 取绝对值
   - 四舍五入
 
@@ -266,86 +292,132 @@
 ## Prompt 5：图表工作室（Chart Studio）—— 核心模块
 
 ```
-这是 DataViz Studio 最核心的模块，要提供 Tableau / Power BI 级别的
-拖拽式图表创建体验。
+这是 DataViz Studio 最核心的模块，是一个可视化的 Python 数据分析平台。
+
+**核心理念：Python 优先**
+- 所有图表由 Python 后端生成（Plotly/Seaborn）
+- 所有操作都可以导出成可执行的 Python 代码
+- 支持 Plotly 和 Seaborn 两种图表库，用户可以切换
+- 使用完整的 Plotly/Seaborn API 参数，不简化
+
+**最新功能增强（2026-02）**:
+- 智能字段识别：自动推断字段类型（数值、时间、分类、有序）和角色（维度、度量）
+- 字段面板：可视化显示维度和度量，带图标和统计信息
+- 动态参数面板：根据图表类型自动显示必需和可选参数
+- 扩展图表类型：新增面积图、瀑布图、雷达图、极坐标图、等高线图、3D曲面图等
 
 界面布局：
-┌──────────┬─────────────────────────┬─────────────┐
-│ 字段面板  │                         │ 配置面板     │
-│          │                         │             │
-│ 度量(数值)│                         │ 图表类型     │
-│ ├ revenue│     图 表 画 布           │ [网格选择]   │
-│ ├ quantity│    （实时渲染）           │             │
-│ ├ profit │                         │ 样式设置     │
-│          │                         │ ├ 主题      │
-│ 维度(分类)│                         │ ├ 配色      │
-│ ├ city   │                         │ ├ 字体      │
-│ ├ product│                         │ ├ 标题      │
-│ ├ date   │                         │ └ 图例      │
-│          │                         │             │
-│──────────│                         │ 导出        │
-│ 拖放区域  │                         │ [PNG] [SVG] │
-│ X轴: [ ] │                         │ [PDF] [HTML]│
-│ Y轴: [ ] │                         │             │
-│ 颜色: [ ] │                         │             │
-│ 大小: [ ] │                         │             │
-│ 分面: [ ] │                         │             │
-└──────────┴─────────────────────────┴─────────────┘
+┌──────────────────────────────────────────────────────┐
+│ 图表库: ○ Plotly（交互式） ○ Seaborn（静态美化）      │
+├──────────┬─────────────────────────┬─────────────────┤
+│ 字段面板  │                         │ 代码预览         │
+│          │                         │                 │
+│ 📊 度量   │                         │ import plotly   │
+│ ├ sales  │                         │ import pandas   │
+│ ├ profit │     图 表 画 布           │                 │
+│ └ qty    │    （实时渲染）           │ fig = px.scatter│
+│          │                         │   df,           │
+│ 🔤 维度   │                         │   x='sales',    │
+│ ├ city   │                         │   y='profit',   │
+│ ├ category│                        │   color='city'  │
+│ └ date   │                         │                 │
+│          │                         │ fig.show()      │
+│ 参数配置  │                         │                 │
+│ x: sales │                         │ [复制] [下载.py]│
+│ y: profit│                         │ [导出Jupyter]   │
+│ color:   │                         │                 │
+│ [city ▼] │                         │                 │
+└──────────┴─────────────────────────┴─────────────────┘
 
-字段面板：
-- 自动将列分为"度量"（数值）和"维度"（分类/日期）
-- 字段旁显示类型图标（#数值 Abc文本 📅日期）
-- 支持拖拽到拖放区域 或 下拉选择（两种交互方式）
-- 拖入字段后自动推断合适的聚合方式
-  度量默认 SUM，维度默认 GROUP BY
+字段面板（新增功能）：
+- 自动识别字段类型：
+  ├── 📊 数值型（度量）：sales, profit, quantity
+  ├── 📅 时间型（维度）：date, timestamp
+  ├── 🔤 分类型（维度）：city, category, status
+  └── 🔢 有序型（维度）：rating, priority
+- 显示字段统计信息：
+  ├── 数值：均值、中位数、范围
+  ├── 分类：唯一值数、最频繁值
+  └── 缺失值百分比
+- 悬停显示详细元数据
+- 支持搜索和筛选字段
 
-图表类型（图标网格选择器，分场景组织）：
-  比较：柱状图 | 分组柱状图 | 堆叠柱状图 | 条形图 | 雷达图
-  趋势：折线图 | 面积图 | 堆叠面积图
-  分布：直方图 | 箱线图 | 小提琴图 | 密度图 | 蜂群图
-  关系：散点图 | 气泡图 | 热力图 | 相关矩阵
-  占比：饼图 | 环形图 | 旭日图 | 矩形树图
-  高级：漏斗图 | 瀑布图 | 桑基图 | 平行坐标 | K线图
-  地图：散点地图 | 填充地图（如有地理字段）
+参数配置面板（动态显示）：
+- 根据图表类型显示必需参数和可选参数
+- Plotly 参数：x, y, color, size, hover_data, facet_row, facet_col, 
+  animation_frame, trendline, marginal_x, marginal_y
+- Seaborn 参数：x, y, hue, size, style, palette, sizes
+- 所有参数都使用下拉选择器（不使用拖拽）
+- 参数变化时实时生成图表和代码
+- 智能字段推荐（根据字段类型推荐适合的参数）
+- 参数验证（检查字段类型是否匹配）
 
-智能推荐：
-- 根据拖入字段类型自动推荐最佳图表
-  1 维度 + 1 度量 → 推荐柱状图
-  日期 + 度量 → 推荐折线图
-  2 度量 → 推荐散点图
-  1 维度(少量类别) + 1 度量 → 推荐饼图
-- 不兼容的图表灰显 + 提示原因
+图表库切换：
+- Plotly（交互式）：支持缩放、平移、悬停、动画等交互功能
+- Seaborn（静态美化）：更美观的默认样式，适合出版和报告
+- 切换时参数面板自动更新
+
+Plotly 支持的图表类型：
+  基础：scatter, line, bar, histogram
+  分布：box, violin, strip
+  关系：scatter_matrix, parallel_coordinates
+  占比：pie, sunburst, treemap, funnel
+  高级：scatter_3d, density_heatmap, density_contour
+  新增：area（面积图）, waterfall（瀑布图）, scatterpolar（极坐标图）,
+       scatterternary（三元图）, contour（等高线图）, surface（3D曲面图）
+
+Seaborn 支持的图表类型：
+  基础：scatterplot, lineplot, barplot
+  分布：histplot, kdeplot, boxplot, violinplot
+  关系：pairplot, jointplot, regplot, lmplot
+  矩阵：heatmap, clustermap
+  新增：catplot（分类图）, displot（分布图）
 
 图表画布：
-- 使用 plotly 渲染，保留所有原生交互（缩放/平移/悬停提示）
-- 实时更新：字段/配置变化后 < 500ms 刷新图表
-- 支持在图表上添加：
-  ├── 趋势线（线性/多项式拟合）
-  ├── 参考线（均值线/中位数线/自定义值）
-  ├── 数据标签（显示数值）
-  └── 注释（文本箭头指向特定数据点）
+- Plotly 图表：使用 dcc.Graph 组件，保留所有原生交互
+- Seaborn 图表：转换为 base64 图片显示
+- 实时更新：参数变化后立即重新生成图表和代码
 
-配置面板：
-- 主题预设（12+ 套）：
-  商务蓝 | 科技暗 | 自然绿 | 学术灰 | 极简白
-  热情红 | 优雅紫 | 清新青 | 复古棕 | 渐变系列...
-- 调色板：D3/ColorBrewer 经典调色板 + 自定义
-- 标题/副标题编辑
-- 轴：标签、范围、刻度、对数轴开关
-- 图例：位置/方向/开关
-- 网格线/背景色
-- 动画开关（有时间维度时支持播放动画）
+代码预览面板（核心功能）：
+- 实时显示生成的 Python 代码
+- 代码包含完整的导入语句、数据加载、图表创建
+- 支持复制代码到剪贴板
+- 支持下载为 .py 文件
+- 支持导出为 Jupyter Notebook
+
+代码导出示例：
+```python
+import plotly.express as px
+import pandas as pd
+
+df = pd.read_csv('data.csv')
+
+fig = px.scatter(
+    df,
+    x='sales',
+    y='profit',
+    color='category',
+    size='quantity',
+    hover_data=['city'],
+    trendline='ols',
+    title='销售分析'
+)
+
+fig.show()
+```
 
 图表管理：
 - 每个创建的图表可命名保存
+- 保存时同时保存图表配置和生成的代码
 - 已保存图表列表（缩略图预览）
 - 图表可复制 / 编辑 / 删除
 - 保存的图表可在"仪表盘"模块中使用
 
 导出：
-- PNG / SVG / PDF（高清静态）
-- HTML（保留 Plotly 交互功能的独立页面）
-- 复制到剪贴板
+- Python 代码（.py 文件）
+- Jupyter Notebook（.ipynb 文件）
+- PNG / HTML（Plotly 图表）
+- PNG（Seaborn 图表）
 ```
 
 ---
@@ -581,6 +653,11 @@
 ```
 DataViz Studio 技术架构设计。
 
+核心原则：Python 优先
+- 所有图表由 Python 后端生成
+- 前端只负责参数收集和结果展示
+- 所有操作可导出为 Python 代码
+
 项目结构：
 dataviz-studio/
 ├── app.py                     # 应用入口 + Dash app 初始化
@@ -593,7 +670,6 @@ dataviz-studio/
 │   ├── data_manager.py        # 全局数据管理（多 DataFrame，undo/redo）
 │   ├── state_manager.py       # 应用状态管理（dcc.Store 封装）
 │   ├── project_io.py          # 项目文件(.dvs)读写
-│   ├── code_generator.py      # 操作 → pandas 代码生成
 │   └── event_bus.py           # 组件间事件通信
 │
 ├── pages/                     # Dash Pages（每个功能模块一个页面）
@@ -601,27 +677,28 @@ dataviz-studio/
 │   ├── data_hub.py            # 数据中心
 │   ├── data_canvas.py         # 数据画布
 │   ├── data_workshop.py       # 数据工坊
-│   ├── chart_studio.py        # 图表工作室
+│   ├── chart_studio.py        # 图表工作室（重点重构）
 │   ├── dashboard.py           # 仪表盘构建器
 │   ├── statistics_lab.py      # 统计实验室
 │   └── advanced_tools.py      # 高级工具
 │
 ├── components/                # 可复用 UI 组件
 │   ├── data_table.py          # AG Grid 封装
-│   ├── chart_builder.py       # 图表构建器组件
-│   ├── field_panel.py         # 字段拖拽面板
+│   ├── chart_builder.py       # 图表构建器组件（重点重构）
+│   ├── field_panel.py         # 字段面板（简化为参考）
 │   ├── filter_builder.py      # 筛选条件构建器
 │   ├── kpi_card.py            # KPI 指标卡
 │   ├── pipeline_view.py       # 操作流水线视图
-│   ├── toast.py               # Toast 通知
+│   ├── code_preview.py        # 代码预览组件（新增）
 │   └── theme_switcher.py      # 主题切换器
 │
 ├── services/                  # 业务逻辑层（不涉及 UI）
 │   ├── data_loader.py         # 数据加载（文件/数据库/URL）
 │   ├── data_cleaner.py        # 数据清洗操作
-│   ├── chart_service.py       # 图表生成逻辑
+│   ├── chart_service.py       # 图表生成逻辑（重点重构）
+│   ├── code_generator.py      # 代码生成服务（重点重构）
 │   ├── stats_service.py       # 统计分析逻辑
-│   ├── export_service.py      # 导出逻辑（PNG/PDF/HTML）
+│   ├── export_service.py      # 导出逻辑（PNG/PDF/HTML/Jupyter）
 │   └── nlp_query.py           # 自然语言查询（可选）
 │
 ├── assets/                    # Dash 静态资源（自动加载）
@@ -640,28 +717,40 @@ dataviz-studio/
 
 技术要点：
 
-1. Dash 回调架构：
-   - 使用 Pattern-Matching Callbacks 处理动态组件
-   - 用 Dash Long Callbacks + Celery 处理耗时操作
-   - 用 clientside_callback 处理纯前端交互（拖拽等）
+1. 图表生成架构：
+   - Python 后端使用 Plotly/Seaborn 生成图表
+   - Plotly 图表返回 JSON，前端用 dcc.Graph 显示
+   - Seaborn 图表转换为 base64 图片，前端用 html.Img 显示
+   - 同时生成对应的 Python 代码字符串
 
-2. 状态管理：
+2. 代码生成服务：
+   - CodeGenerator 类负责生成完整的 Python 代码
+   - 包含导入语句、数据加载、图表创建、样式配置
+   - 支持 Plotly 和 Seaborn 两种代码风格
+   - 代码可直接在 Python 环境中运行
+
+3. 图表服务重构：
+   - ChartService 类支持多图表库
+   - set_library() 方法切换 Plotly/Seaborn
+   - create_chart() 方法返回图表对象和代码
+   - 完整的参数支持（不简化）
+
+4. 状态管理：
    - dcc.Store（session 级别）存储当前状态
    - 服务端缓存大数据（Flask-Caching / diskcache）
    - 操作历史栈（undo/redo 实现）
+   - 代码历史记录
 
-3. 性能优化：
+5. 性能优化：
    - 大数据集：服务端分页 + AG Grid 虚拟滚动
    - 图表：数据点过多时自动降采样
    - 异步加载：非关键数据延迟加载
+   - Seaborn 图表缓存
 
-4. 拖拽实现：
-   - 使用 dash-draggable 或自定义 JS 组件
-   - 字段拖拽到图表区域是核心交互，必须流畅
-
-5. 可扩展性：
+6. 可扩展性：
    - 每个 page 模块独立，共享 core 和 services
    - 新增功能 = 新增一个 page + 注册到导航
+   - 图表库可扩展（未来可添加 Matplotlib、Altair 等）
 ```
 
 ---
@@ -680,32 +769,48 @@ Phase 1 — 可用骨架（2周）：
   → 目标：能加载数据、看到表格、感受到产品质感
 
 Phase 2 — 核心体验（3周）：
-  ✅ 图表工作室（拖拽式，10+ 图表类型）
-  ✅ 智能图表推荐
-  ✅ 样式配置面板
-  ✅ 图表导出
-  → 目标：能像 Tableau 一样拖拽创建图表
+  ✅ 图表工作室（Python 优先架构）
+  ✅ 支持 Plotly 和 Seaborn 两种图表库
+  ✅ 完整的 API 参数支持
+  ✅ 实时代码预览和导出
+  → 目标：真正的可视化 Python 数据分析平台
 
 Phase 3 — 分析能力（2周）：
   ✅ 数据清洗面板 + 操作流水线
   ✅ 描述性统计 + 相关性分析
   ✅ 筛选构建器
-  ✅ 代码生成功能
-  → 目标：完整的数据分析流程
+  ✅ 代码生成功能（所有操作）
+  → 目标：完整的数据分析流程，全程可导出代码
 
-Phase 4 — 看板与高级（3周）：
-  ✅ 仪表盘构建器 + 交叉筛选
-  ✅ KPI 指标卡
-  ✅ 假设检验向导
-  ✅ 数据透视表
+Phase 4 — 功能增强（3-4周，当前阶段）：
+  🔄 Week 1: 核心数据清洗功能
+     ✅ 列拆分、列合并、查找替换、字符串清理
+     ✅ 单元测试覆盖率 > 80%
+  🔄 Week 2: 数值处理功能
+     ⏳ 数值分箱、标准化归一化
+     ⏳ 滚动窗口函数、累积函数
+  ⏳ Week 3: 图表功能增强
+     - 智能字段识别和字段面板
+     - 动态参数面板
+     - 扩展图表类型（6+ Plotly, 4+ Seaborn）
+  ⏳ Week 4: 集成测试和文档
+     - 端到端集成测试
+     - 性能优化
+     - 用户文档更新
+
+Phase 5 — 看板与高级（3周）：
+  ⏳ 仪表盘构建器 + 交叉筛选
+  ⏳ KPI 指标卡
+  ⏳ 假设检验向导
+  ⏳ 数据透视表
   → 目标：可与 Power BI 对比演示
 
-Phase 5 — 差异化（持续）：
-  ✅ 数据故事
-  ✅ 时间序列分析
-  ✅ 数据对比
-  ✅ 项目保存/加载
-  ✅ 导出为 Jupyter Notebook
+Phase 6 — 差异化（持续）：
+  ⏳ 数据故事
+  ⏳ 时间序列分析
+  ⏳ 数据对比
+  ⏳ 项目保存/加载
+  ⏳ 导出为 Jupyter Notebook
   → 目标：超越 Power BI 免费版
 
 代码质量要求：

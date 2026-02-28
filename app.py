@@ -31,6 +31,8 @@ import pages.data_canvas
 import pages.chart_studio
 import pages.data_workshop
 import pages.statistics_lab
+import pages.dashboard
+import pages.advanced
 
 # ── 初始化 Dash 应用 ──────────────────────────────────
 
@@ -79,8 +81,6 @@ app.layout = html.Div(
 )
 def route_page(pathname: str):
     """根据 URL 渲染对应页面。"""
-    print(f"[DEBUG] route_page called with pathname: {pathname}")
-    
     try:
         # Lazy imports to avoid circular deps
         from pages.welcome import create_welcome_page
@@ -91,45 +91,25 @@ def route_page(pathname: str):
         from pages.statistics_lab import layout as statistics_lab_layout
 
         if pathname == "/canvas":
-            print(f"[DEBUG] Routing to canvas page")
             return create_data_canvas_page()
         elif pathname == "/data":
-            print(f"[DEBUG] Routing to data hub page")
             return create_data_hub_page()
         elif pathname == "/charts":
-            print(f"[DEBUG] Routing to chart studio page")
             return create_chart_studio_page()
         elif pathname == "/workshop":
-            print(f"[DEBUG] Routing to data workshop page")
             return data_workshop_layout()
         elif pathname == "/stats":
-            print(f"[DEBUG] Routing to statistics lab page")
             return statistics_lab_layout()
-        elif pathname in ("/dashboard", "/advanced"):
-            # Placeholder pages for Phase 4+
-            labels = {
-                "/dashboard":("📋", "仪表盘"),
-                "/advanced": ("⚡", "高级工具"),
-            }
-            icon, name = labels[pathname]
-            print(f"[DEBUG] Routing to placeholder page: {name}")
-            return html.Div(
-                className="dvs-empty",
-                style={"minHeight": "60vh"},
-                children=[
-                    html.Div(icon, className="dvs-empty__icon"),
-                    html.Div(f"{name} — 即将推出", className="dvs-empty__text"),
-                    html.Div("该功能将在后续版本中实现", style={
-                        "color": "var(--text-muted)", "fontSize": "var(--text-sm)"
-                    }),
-                ],
-            )
+        elif pathname == "/dashboard":
+            from pages.dashboard import create_dashboard_page
+            return create_dashboard_page()
+        elif pathname == "/advanced":
+            from pages.advanced import create_advanced_page
+            return create_advanced_page()
         else:
             # Default: welcome page
-            print(f"[DEBUG] Routing to welcome page (default)")
             return create_welcome_page()
     except Exception as e:
-        print(f"[ERROR] Exception in route_page: {e}")
         import traceback
         traceback.print_exc()
         return html.Div(

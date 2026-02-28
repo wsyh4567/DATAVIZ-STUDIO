@@ -1727,3 +1727,180 @@
         grid-template-columns: 1fr;
     }
 }
+
+
+/* ============================================
+   图表工作室 - Python 优先架构样式
+   ============================================ */
+
+/* 图表库切换器 */
+.library-switcher {
+    display: flex;
+    align-items: center;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.library-selector label {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    margin: 0;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.library-selector input[type="radio"] {
+    margin-right: 8px;
+}
+
+.library-selector label:hover {
+    background: var(--bg-hover);
+}
+
+.library-info {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* 参数配置面板 */
+.params-panel {
+    padding: 16px;
+}
+
+.params-panel .form-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+/* 图表占位符 */
+.chart-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 2px dashed var(--border);
+}
+
+.placeholder-text {
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+/* 代码预览面板 */
+.code-preview-panel {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.code-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.code-preview-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.code-preview-content textarea {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 16px;
+    resize: vertical;
+}
+
+.code-preview-content textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* 按钮组样式 */
+.btn-group-sm .btn {
+    font-size: 0.875rem;
+    padding: 6px 12px;
+}
+
+.btn-outline-primary {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--accent);
+    color: white;
+}
+
+.btn-outline-secondary {
+    color: var(--text-secondary);
+    border-color: var(--border);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.btn-outline-info {
+    color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.btn-outline-info:hover {
+    background-color: #3b82f6;
+    color: white;
+}
+
+/* Bootstrap Icons */
+.bi {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* 下拉选择器样式 */
+.Select-control {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border) !important;
+    color: var(--text-primary) !important;
+}
+
+.Select-menu-outer {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border) !important;
+}
+
+.Select-option {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.Select-option:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+.Select-value-label {
+    color: var(--text-primary) !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+    .code-preview-panel {
+        margin-top: 20px;
+    }
+}

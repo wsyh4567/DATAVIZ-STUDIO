@@ -1,2431 +1,1060 @@
-# -*- coding: utf-8 -*-
 """
-数据工坊页面 - 数据清洗与转换
-"""
-from dash import html, dcc, callback, Input, Output, State, ALL, MATCH
-import dash_bootstrap_components as dbc
-from core.data_manager import DataManager
-from services.code_generator import CodeGenerator
+数据工坊实时预览页面
 
-# 全局代码生成器实例
+提供实时数据预览和操作管理功能，支持交互式参数配置弹窗。
+"""
+
+import dash
+from dash import html, dcc, callback, Input, Output, State, ctx, no_update, ALL
+import dash_bootstrap_components as dbc
+import pandas as pd
+import json
+import uuid
+from datetime import datetime
+
+from core.data_manager import DataManager
+from services.data_workshop.preview_engine import PreviewEngine
+from services.data_workshop.step_manager import StepManager
+from services.data_workshop.undo_redo_stack import UndoRedoStack
+from services.data_workshop.operation_executor import OperationExecutor
+from services.data_workshop.code_generator import CodeGenerator
+from components.data_workshop.data_grid import create_data_grid, create_data_stats
+from components.data_workshop.step_panel import create_step_panel, create_step_header, create_step_actions
+from components.data_workshop.toolbar import create_operation_toolbar
+from components.data_workshop.code_preview_panel import create_code_modal
+
+# 初始化全局组件
+preview_engine = PreviewEngine(max_preview_rows=1000)
+step_manager = StepManager()
+undo_stack = UndoRedoStack()
+operation_executor = OperationExecutor()
 code_generator = CodeGenerator()
+
+# 所有操作按钮ID及其对应的操作类型和中文名
+OPERATION_BUTTONS = {
+    'btn-filter': ('filter', '筛选'),
+    'btn-drop-column': ('drop_column', '删除列'),
+    'btn-rename-column': ('rename_column', '重命名'),
+    'btn-sort': ('sort', '排序'),
+    'btn-type-convert': ('type_conversion', '类型转换'),
+    'btn-fill-missing': ('fill_missing', '填充缺失值'),
+    'btn-drop-duplicates': ('drop_duplicates', '去重'),
+    'btn-split-column': ('split_column', '拆分列'),
+    'btn-merge-columns': ('merge_columns', '合并列'),
+    'btn-replace-value': ('replace_value', '替换值'),
+    'btn-strip-whitespace': ('strip_whitespace', '去除空格'),
+    'btn-change-case': ('change_case', '大小写转换'),
+    'btn-regex-replace': ('find_replace_regex', '正则替换'),
+    'btn-extract-substring': ('extract_substring', '提取子串'),
+    'btn-bin-column': ('bin_column', '分箱'),
+    'btn-normalize': ('normalize', '标准化'),
+    'btn-drop-missing-rows': ('drop_missing_rows', '删除缺失行'),
+    'btn-duplicate-column': ('duplicate_column', '复制列'),
+    'btn-create-calculated': ('create_calculated', '计算列'),
+}
+
+
+def _get_columns_from_store(store_data):
+    """从 store 数据中获取列名列表"""
+    if not store_data:
+        return []
+    try:
+        df = pd.read_json(store_data, orient='split')
+        return list(df.columns)
+    except Exception:
+        return []
+
 
 def layout():
     """数据工坊页面布局"""
-    data_manager = DataManager()
+    # 尝试从 DataManager 加载活跃数据集
+    dm = DataManager()
+    has_active = dm.active_df is not None and not dm.active_df.empty
 
-    return html.Div([
-        # 页面标题
-        html.Div([
-            html.H3("🧹 数据工坊", className="page-title"),
-            html.P("数据清洗与转换", className="page-subtitle")
-        ], className="page-header"),
-
-        # 主内容区域
-        html.Div([
-            # 左侧操作菜单
-            html.Div([
-                html.H5("操作菜单", className="mb-3"),
-
-                # 列操作
-                dbc.Accordion([
-                    dbc.AccordionItem([
-                        dbc.Button("删除列", id="btn-delete-columns", color="danger", size="sm", className="w-100 mb-2"),
-                        dbc.Button("重命名列", id="btn-rename-column", color="primary", size="sm", className="w-100 mb-2"),
-                        dbc.Button("拆分列", id="btn-split-column", color="info", size="sm", className="w-100 mb-2"),
-                        dbc.Button("合并列", id="btn-merge-columns", color="info", size="sm", className="w-100 mb-2"),
-                    ], title="列操作"),
-
-                    # 缺失值处理
-                    dbc.AccordionItem([
-                        dbc.Button("查看缺失值", id="btn-view-missing", color="warning", size="sm", className="w-100 mb-2"),
-                        dbc.Button("填充缺失值", id="btn-fill-missing", color="primary", size="sm", className="w-100 mb-2"),
-                        dbc.Button("删除缺失行", id="btn-drop-missing", color="danger", size="sm", className="w-100 mb-2"),
-                    ], title="缺失值处理"),
-
-                    # 数据类型转换
-                    dbc.AccordionItem([
-                        dbc.Button("转换类型", id="btn-convert-type", color="primary", size="sm", className="w-100 mb-2"),
-                        dbc.Button("智能检测", id="btn-auto-detect", color="info", size="sm", className="w-100 mb-2"),
-                    ], title="类型转换"),
-
-                    # 筛选与排序
-                    dbc.AccordionItem([
-                        dbc.Button("添加筛选条件", id="btn-add-filter", color="primary", size="sm", className="w-100 mb-2"),
-                        dbc.Button("多列排序", id="btn-sort-columns", color="info", size="sm", className="w-100 mb-2"),
-                        dbc.Button("去重", id="btn-remove-duplicates", color="warning", size="sm", className="w-100 mb-2"),
-                    ], title="筛选与排序"),
-
-                    # 文本处理
-                    dbc.AccordionItem([
-                        dbc.Button("去空格", id="btn-strip-text", color="primary", size="sm", className="w-100 mb-2"),
-                        dbc.Button("大小写转换", id="btn-case-convert", color="info", size="sm", className="w-100 mb-2"),
-                        dbc.Button("查找替换", id="btn-find-replace", color="primary", size="sm", className="w-100 mb-2"),
-                    ], title="文本处理"),
-
-                    # 数值处理
-                    dbc.AccordionItem([
-                        dbc.Button("分箱", id="btn-binning", color="primary", size="sm", className="w-100 mb-2"),
-                        dbc.Button("标准化", id="btn-standardize", color="info", size="sm", className="w-100 mb-2"),
-                        dbc.Button("归一化", id="btn-normalize", color="info", size="sm", className="w-100 mb-2"),
-                    ], title="数值处理"),
-
-                    # 计算列
-                    dbc.AccordionItem([
-                        dbc.Button("新增计算列", id="btn-add-calc-column", color="success", size="sm", className="w-100 mb-2"),
-                        dbc.Button("常用模板", id="btn-calc-templates", color="info", size="sm", className="w-100 mb-2"),
-                    ], title="计算列"),
-                ], start_collapsed=False, always_open=True),
-
-            ], className="workshop-menu"),
-
-            # 中间预览区域
-            html.Div([
+    return dbc.Container([
+        # 标题栏
+        dbc.Row([
+            dbc.Col([
                 html.Div([
-                    html.H5("数据预览", className="mb-3"),
-                    html.Div(id="workshop-preview-area", children=[
-                        html.P("请选择左侧操作", className="text-muted text-center mt-5")
-                    ])
-                ], className="workshop-preview"),
-            ], className="workshop-main"),
-
-            # 右侧操作流水线
-            html.Div([
-                html.Div([
-                    html.H5("操作流水线", className="mb-3"),
-                    dbc.ButtonGroup([
-                        dbc.Button("撤销", id="btn-undo", size="sm", outline=True),
-                        dbc.Button("重做", id="btn-redo", size="sm", outline=True),
-                        dbc.Button("清空", id="btn-clear-pipeline", size="sm", outline=True, color="danger"),
-                    ], className="mb-3 w-100"),
-                ]),
-
-                html.Div(id="pipeline-list", children=[
-                    html.P("暂无操作记录", className="text-muted text-center")
-                ], className="pipeline-items"),
-
-                html.Hr(),
-
-                dbc.Button("导出为 Python 脚本", id="btn-export-code", color="primary", size="sm", className="w-100"),
-
-            ], className="workshop-pipeline"),
-
-        ], className="workshop-container"),
-
-        # 模态框容器
-        html.Div(id="workshop-modals"),
-
-        # 存储操作历史
-        dcc.Store(id="operation-history", data=[]),
-        dcc.Store(id="operation-index", data=-1),
-
-    ], className="page-container")
-
-
-def create_pipeline_item(operation, index):
-    """创建流水线操作项"""
-    return html.Div([
-        html.Div([
-            html.Span(f"{index + 1}. ", className="pipeline-number"),
-            html.Span(operation.get('description', '未知操作'), className="pipeline-desc"),
-        ], className="pipeline-item-content"),
-        html.Button("×", id={"type": "remove-operation", "index": index}, className="pipeline-remove-btn"),
-    ], className="pipeline-item")
-
-
-def update_pipeline_display(operations):
-    """更新流水线显示"""
-    if not operations:
-        return html.P("暂无操作记录", className="text-muted text-center")
-
-    return html.Div([
-        create_pipeline_item(op, i) for i, op in enumerate(operations)
-    ])
-
-
-# 删除列模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-delete-columns", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_delete_columns_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    columns = df.columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("删除列"),
-        dbc.ModalBody([
-            html.Label("选择要删除的列："),
-            dbc.Checklist(
-                id="delete-columns-checklist",
-                options=[{"label": col, "value": col} for col in columns],
-                value=[],
-            ),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-delete", color="secondary", size="sm"),
-            dbc.Button("确认删除", id="btn-confirm-delete", color="danger", size="sm"),
-        ]),
-    ], id="delete-columns-modal", is_open=True, size="lg")
-
-
-# 重命名列模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-rename-column", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_rename_column_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    columns = df.columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("重命名列"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="rename-column-select",
-                options=[{"label": col, "value": col} for col in columns],
-                placeholder="选择要重命名的列"
-            ),
-            html.Br(),
-            html.Label("新名称："),
-            dbc.Input(id="rename-column-input", placeholder="输入新列名"),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-rename", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-rename", color="primary", size="sm"),
-        ]),
-    ], id="rename-column-modal", is_open=True)
-
-
-# 查看缺失值
-@callback(
-    Output("workshop-preview-area", "children", allow_duplicate=True),
-    Input("btn-view-missing", "n_clicks"),
-    prevent_initial_call=True
-)
-def view_missing_values(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("请先加载数据集", className="text-muted")
-
-    # 计算缺失值
-    missing_data = []
-    for col in df.columns:
-        missing_count = df[col].isnull().sum()
-        missing_pct = (missing_count / len(df)) * 100
-        if missing_count > 0:
-            missing_data.append({
-                "column": col,
-                "count": missing_count,
-                "percentage": missing_pct
-            })
-
-    if not missing_data:
-        return html.Div([
-            html.H5("缺失值分析", className="mb-3"),
-            dbc.Alert("✓ 数据集中没有缺失值", color="success")
-        ])
-
-    # 按缺失数量排序
-    missing_data.sort(key=lambda x: x["count"], reverse=True)
-
-    return html.Div([
-        html.H5("缺失值分析", className="mb-3"),
-        dbc.Alert(f"发现 {len(missing_data)} 列包含缺失值", color="warning"),
-
-        html.Div([
-            dbc.Table([
-                html.Thead([
-                    html.Tr([
-                        html.Th("列名"),
-                        html.Th("缺失数量"),
-                        html.Th("缺失比例"),
-                        html.Th("可视化"),
-                    ])
-                ]),
-                html.Tbody([
-                    html.Tr([
-                        html.Td(item["column"]),
-                        html.Td(f"{item['count']:,}"),
-                        html.Td(f"{item['percentage']:.2f}%"),
-                        html.Td([
-                            html.Div([
-                                html.Div(style={
-                                    "width": f"{item['percentage']:.1f}%",
-                                    "height": "20px",
-                                    "backgroundColor": "#ef4444",
-                                    "borderRadius": "4px"
-                                })
-                            ], style={"width": "100%", "backgroundColor": "#f1f5f9", "borderRadius": "4px"})
-                        ]),
-                    ]) for item in missing_data
+                    html.H2([
+                        html.I(className="bi bi-magic me-3", style={"color": "var(--accent)"}),
+                        "数据工坊 - 实时预览"
+                    ], className="mb-2", style={"fontWeight": "600"}),
+                    html.P("所见即所得的数据清洗和转换体验",
+                          style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
                 ])
-            ], bordered=True, hover=True, striped=True)
-        ])
-    ])
+            ], width=6),
+            dbc.Col([
+                html.Div([
+                    dbc.Button([
+                        html.I(className="bi bi-check2-circle me-2"),
+                        "应用到数据集"
+                    ], id="btn-apply-to-dataset", color="warning", size="sm", outline=True, className="me-2"),
+                    dbc.Button([
+                        html.I(className="bi bi-code-slash me-2"),
+                        "查看代码"
+                    ], id="btn-view-code", color="success", size="sm", outline=True, className="me-2"),
+                    dbc.Button([
+                        html.I(className="bi bi-download me-2"),
+                        "导出"
+                    ], id="btn-export", color="primary", size="sm", outline=True),
+                ], className="d-flex justify-content-end")
+            ], width=6),
+        ], className="mb-4"),
+
+        # 主要内容区
+        dbc.Row([
+            # 左侧：操作工具栏
+            dbc.Col([
+                create_operation_toolbar()
+            ], width=2),
+
+            # 中间：数据预览区
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.Div([
+                            html.Span("数据预览", style={"fontWeight": "bold"}),
+                            html.Div(id="data-stats", children=[
+                                dbc.Badge("0 行", color="primary", className="me-1"),
+                                dbc.Badge("0 列", color="info"),
+                            ]),
+                        ], className="d-flex align-items-center justify-content-between")
+                    ]),
+                    dbc.CardBody([
+                        html.Div(id="data-table-container", children=[
+                            html.Div([
+                                html.I(className="bi bi-inbox", style={"fontSize": "3rem", "color": "var(--text-muted)"}),
+                                html.P("暂无数据", className="text-muted mt-3"),
+                                html.P("请先加载数据集", style={"color": "var(--text-muted)", "fontSize": "0.875rem"}),
+                            ], className="text-center py-5")
+                        ]),
+
+                        # 仅当没有活跃数据集时显示"加载示例数据"按钮
+                        html.Div([
+                            dbc.Button([
+                                html.I(className="bi bi-file-earmark-spreadsheet me-2"),
+                                "加载示例数据"
+                            ], id="btn-load-sample", color="primary", className="mt-3")
+                        ], className="text-center", style={"display": "none"} if has_active else {})
+                    ], style={"padding": "1rem"})
+                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=7),
+
+            # 右侧：步骤管理面板
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.Div(id="step-header", children=create_step_header(0))
+                    ]),
+                    dbc.CardBody([
+                        html.Div(id="step-list", children=create_step_panel([])),
+                        create_step_actions(),
+                    ], style={"padding": "1rem", "maxHeight": "600px", "overflowY": "auto"})
+                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=3),
+        ]),
+
+        # 数据存储
+        dcc.Store(id='original-data-store'),
+        dcc.Store(id='preview-data-store'),
+        dcc.Store(id='pipeline-store', data=[]),
+        dcc.Store(id='undo-redo-store', data={'can_undo': False, 'can_redo': False}),
+        dcc.Store(id='pending-operation-type', data=None),
+        dcc.Store(id='dm-loaded', data=has_active),
+
+        # 操作配置模态框
+        _create_operation_modal(),
+
+        # 代码预览模态框
+        create_code_modal(),
+
+        # 下载组件
+        dcc.Download(id='download-code'),
+
+        # 状态提示
+        html.Div(id='copy-code-status', style={'display': 'none'}),
+        html.Div(id='preview-stats-display', style={'display': 'none'}),
+        html.Div(id='apply-dataset-status', style={'display': 'none'}),
+
+    ], fluid=True, className="py-4")
 
 
-# 填充缺失值模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-fill-missing", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_fill_missing_modal(n_clicks):
-    if not n_clicks:
-        return None
+# ============================================================================
+# 操作配置模态框
+# ============================================================================
 
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    # 找出有缺失值的列
-    columns_with_missing = [col for col in df.columns if df[col].isnull().sum() > 0]
-
-    if not columns_with_missing:
-        return dbc.Modal([
-            dbc.ModalHeader("提示"),
-            dbc.ModalBody("数据集中没有缺失值"),
-        ], is_open=True)
-
+def _create_operation_modal():
+    """创建通用操作配置模态框"""
     return dbc.Modal([
-        dbc.ModalHeader("填充缺失值"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="fill-missing-column-select",
-                options=[{"label": col, "value": col} for col in columns_with_missing],
-                placeholder="选择要填充的列"
-            ),
-            html.Br(),
-            html.Label("填充策略："),
-            dcc.Dropdown(
-                id="fill-missing-strategy",
-                options=[
-                    {"label": "均值（仅数值列）", "value": "mean"},
-                    {"label": "中位数（仅数值列）", "value": "median"},
-                    {"label": "众数", "value": "mode"},
-                    {"label": "固定值", "value": "constant"},
-                    {"label": "前向填充", "value": "ffill"},
-                    {"label": "后向填充", "value": "bfill"},
-                ],
-                placeholder="选择填充策略"
-            ),
-            html.Br(),
-            html.Div(id="fill-constant-input-container"),
-        ]),
+        dbc.ModalHeader(dbc.ModalTitle(id="operation-modal-title", children="操作配置")),
+        dbc.ModalBody(id="operation-modal-body", children=[]),
         dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-fill", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-fill", color="primary", size="sm"),
+            dbc.Button("取消", id="btn-modal-cancel", color="secondary", className="me-2"),
+            dbc.Button("应用", id="btn-modal-apply", color="primary"),
         ]),
-    ], id="fill-missing-modal", is_open=True, size="lg")
+    ], id="operation-modal", is_open=False, size="lg")
 
 
-# 显示固定值输入框
-@callback(
-    Output("fill-constant-input-container", "children"),
-    Input("fill-missing-strategy", "value")
-)
-def show_constant_input(strategy):
-    if strategy == "constant":
+def _build_form_for_operation(op_type, columns):
+    """根据操作类型构建配置表单"""
+    col_options = [{'label': c, 'value': c} for c in columns]
+
+    if op_type == 'filter':
         return html.Div([
-            html.Label("填充值："),
-            dbc.Input(id="fill-constant-value", placeholder="输入填充值", type="text")
-        ])
-    return None
-
-
-# 类型转换模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-convert-type", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_convert_type_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    columns = df.columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("数据类型转换"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="convert-type-column-select",
-                options=[{"label": f"{col} ({df[col].dtype})", "value": col} for col in columns],
-                placeholder="选择要转换的列"
-            ),
-            html.Br(),
-            html.Label("目标类型："),
-            dcc.Dropdown(
-                id="convert-target-type",
-                options=[
-                    {"label": "整数 (int)", "value": "int"},
-                    {"label": "浮点数 (float)", "value": "float"},
-                    {"label": "字符串 (str)", "value": "str"},
-                    {"label": "日期时间 (datetime)", "value": "datetime"},
-                    {"label": "布尔值 (bool)", "value": "bool"},
-                    {"label": "分类 (category)", "value": "category"},
-                ],
-                placeholder="选择目标类型"
-            ),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-convert", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-convert", color="primary", size="sm"),
-        ]),
-    ], id="convert-type-modal", is_open=True)
-
-
-# 确认删除列
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "children", allow_duplicate=True)],
-    Input("btn-confirm-delete", "n_clicks"),
-    [State("delete-columns-select", "value"),
-     State("operation-history", "children")],
-    prevent_initial_call=True
-)
-def confirm_delete_columns(n_clicks, columns, current_history):
-    if not n_clicks or not columns:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        # 删除列
-        df_new = df.drop(columns=columns)
-        data_manager.active_df = df_new
-
-        # 添加到操作历史
-        new_history = add_operation_to_history(
-            current_history,
-            f"删除列：{', '.join(columns)}",
-            f"{len(df.columns)} → {len(df_new.columns)} 列"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 列删除完成"),
-                html.Br(),
-                f"已删除 {len(columns)} 列：{', '.join(columns)}"
-            ], color="success"),
-            html.H5("更新后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("运算符", className="form-label"),
+                    dcc.Dropdown(id='modal-param-operator', options=[
+                        {'label': '等于 (==)', 'value': '=='},
+                        {'label': '不等于 (!=)', 'value': '!='},
+                        {'label': '大于 (>)', 'value': '>'},
+                        {'label': '小于 (<)', 'value': '<'},
+                        {'label': '大于等于 (>=)', 'value': '>='},
+                        {'label': '小于等于 (<=)', 'value': '<='},
+                        {'label': '包含', 'value': 'contains'},
+                        {'label': '开头是', 'value': 'startswith'},
+                        {'label': '结尾是', 'value': 'endswith'},
+                    ], placeholder="选择运算符"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("值", className="form-label"),
+                    dbc.Input(id='modal-param-value', type='text', placeholder="输入筛选值"),
+                ], width=4),
+            ]),
         ])
 
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"删除列失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 确认重命名列
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "children", allow_duplicate=True)],
-    Input("btn-confirm-rename", "n_clicks"),
-    [State("rename-column-select", "value"),
-     State("rename-column-input", "value"),
-     State("operation-history", "children")],
-    prevent_initial_call=True
-)
-def confirm_rename_column(n_clicks, old_name, new_name, current_history):
-    if not n_clicks or not old_name or not new_name:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        # 重命名列
-        df_new = df.rename(columns={old_name: new_name})
-        data_manager.active_df = df_new
-
-        # 添加到操作历史
-        new_history = add_operation_to_history(
-            current_history,
-            f"重命名列：{old_name} → {new_name}",
-            "列名已更新"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 列重命名完成"),
-                html.Br(),
-                f"'{old_name}' → '{new_name}'"
-            ], color="success"),
-            html.H5("更新后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
+    elif op_type == 'drop_column':
+        return html.Div([
+            html.Label("选择要删除的列（可多选）", className="form-label"),
+            dcc.Dropdown(id='modal-param-columns-multi', options=col_options, multi=True, placeholder="选择列"),
         ])
 
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"重命名列失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 确认填充缺失值
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "children", allow_duplicate=True)],
-    Input("btn-confirm-fill", "n_clicks"),
-    [State("fill-columns-select", "value"),
-     State("fill-method-select", "value"),
-     State("fill-value-input", "value"),
-     State("operation-history", "children")],
-    prevent_initial_call=True
-)
-def confirm_fill_missing(n_clicks, columns, method, custom_value, current_history):
-    if not n_clicks or not columns or not method:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        df_new = df.copy()
-        filled_count = 0
-
-        for col in columns:
-            missing_before = df_new[col].isnull().sum()
-
-            if method == "mean":
-                df_new[col].fillna(df_new[col].mean(), inplace=True)
-            elif method == "median":
-                df_new[col].fillna(df_new[col].median(), inplace=True)
-            elif method == "mode":
-                mode_val = df_new[col].mode()
-                if len(mode_val) > 0:
-                    df_new[col].fillna(mode_val[0], inplace=True)
-            elif method == "forward":
-                df_new[col].fillna(method='ffill', inplace=True)
-            elif method == "backward":
-                df_new[col].fillna(method='bfill', inplace=True)
-            elif method == "custom" and custom_value:
-                df_new[col].fillna(custom_value, inplace=True)
-
-            filled_count += missing_before - df_new[col].isnull().sum()
-
-        data_manager.active_df = df_new
-
-        # 添加到操作历史
-        method_names = {
-            "mean": "均值", "median": "中位数", "mode": "众数",
-            "forward": "前向填充", "backward": "后向填充", "custom": "自定义值"
-        }
-        new_history = add_operation_to_history(
-            current_history,
-            f"填充缺失值：{method_names.get(method, method)}",
-            f"填充了 {filled_count} 个缺失值"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 缺失值填充完成"),
-                html.Br(),
-                f"填充方法：{method_names.get(method, method)}",
-                html.Br(),
-                f"填充了 {filled_count} 个缺失值"
-            ], color="success"),
-            html.H5("更新后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
+    elif op_type == 'rename_column':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择要重命名的列"),
+                ], width=6),
+                dbc.Col([
+                    html.Label("新名称", className="form-label"),
+                    dbc.Input(id='modal-param-new-name', type='text', placeholder="输入新列名"),
+                ], width=6),
+            ]),
         ])
 
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"填充缺失值失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 确认类型转换
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "children", allow_duplicate=True)],
-    Input("btn-confirm-convert", "n_clicks"),
-    [State("convert-column-select", "value"),
-     State("convert-type-select", "value"),
-     State("operation-history", "children")],
-    prevent_initial_call=True
-)
-def confirm_convert_type(n_clicks, column, target_type, current_history):
-    if not n_clicks or not column or not target_type:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        df_new = df.copy()
-        old_type = str(df_new[column].dtype)
-
-        # 类型转换
-        if target_type == "int":
-            df_new[column] = pd.to_numeric(df_new[column], errors='coerce').astype('Int64')
-        elif target_type == "float":
-            df_new[column] = pd.to_numeric(df_new[column], errors='coerce')
-        elif target_type == "str":
-            df_new[column] = df_new[column].astype(str)
-        elif target_type == "datetime":
-            df_new[column] = pd.to_datetime(df_new[column], errors='coerce')
-        elif target_type == "bool":
-            df_new[column] = df_new[column].astype(bool)
-
-        data_manager.active_df = df_new
-
-        # 添加到操作历史
-        new_history = add_operation_to_history(
-            current_history,
-            f"类型转换：{column}",
-            f"{old_type} → {target_type}"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 类型转换完成"),
-                html.Br(),
-                f"列：{column}",
-                html.Br(),
-                f"{old_type} → {target_type}"
-            ], color="success"),
-            html.H5("更新后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
+    elif op_type == 'sort':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择排序列"),
+                ], width=6),
+                dbc.Col([
+                    html.Label("排序方式", className="form-label"),
+                    dcc.Dropdown(id='modal-param-ascending', options=[
+                        {'label': '升序', 'value': 'true'},
+                        {'label': '降序', 'value': 'false'},
+                    ], value='true', clearable=False),
+                ], width=6),
+            ]),
         ])
 
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"类型转换失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 关闭基础操作模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    [Input("btn-cancel-delete", "n_clicks"),
-     Input("btn-cancel-rename", "n_clicks"),
-     Input("btn-cancel-fill", "n_clicks"),
-     Input("btn-cancel-convert", "n_clicks"),
-     Input("btn-cancel-filter", "n_clicks"),
-     Input("btn-cancel-sort", "n_clicks"),
-     Input("btn-cancel-dedup", "n_clicks")],
-    prevent_initial_call=True
-)
-def close_basic_modals(*args):
-    return None
-
-
-# 添加筛选条件模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-add-filter", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_filter_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    columns = df.columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("添加筛选条件"),
-        dbc.ModalBody([
-            html.Div([
-                html.Label("选择列："),
-                dcc.Dropdown(
-                    id="filter-column-select",
-                    options=[{"label": col, "value": col} for col in columns],
-                    placeholder="选择要筛选的列"
-                ),
-                html.Br(),
-                html.Label("操作符："),
-                dcc.Dropdown(
-                    id="filter-operator-select",
-                    options=[
-                        {"label": "等于 (=)", "value": "eq"},
-                        {"label": "不等于 (≠)", "value": "ne"},
-                        {"label": "大于 (>)", "value": "gt"},
-                        {"label": "大于等于 (≥)", "value": "ge"},
-                        {"label": "小于 (<)", "value": "lt"},
-                        {"label": "小于等于 (≤)", "value": "le"},
-                        {"label": "包含", "value": "contains"},
-                        {"label": "不包含", "value": "not_contains"},
-                        {"label": "以...开头", "value": "startswith"},
-                        {"label": "以...结尾", "value": "endswith"},
-                    ],
-                    placeholder="选择操作符"
-                ),
-                html.Br(),
-                html.Label("值："),
-                dbc.Input(id="filter-value-input", placeholder="输入筛选值", type="text"),
-                html.Br(),
-                html.Div(id="filter-preview-info", className="text-muted small"),
-            ])
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-filter", color="secondary", size="sm"),
-            dbc.Button("应用筛选", id="btn-confirm-filter", color="primary", size="sm"),
-        ]),
-    ], id="filter-modal", is_open=True, size="lg")
-
-
-# 多列排序模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-sort-columns", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_sort_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    columns = df.columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("多列排序"),
-        dbc.ModalBody([
-            html.Label("选择排序列（按优先级顺序）："),
-            html.Div([
-                html.Div([
-                    dcc.Dropdown(
-                        id={"type": "sort-column", "index": 0},
-                        options=[{"label": col, "value": col} for col in columns],
-                        placeholder="第一排序列",
-                        className="mb-2"
-                    ),
-                    dcc.Dropdown(
-                        id={"type": "sort-order", "index": 0},
-                        options=[
-                            {"label": "升序 ↑", "value": "asc"},
-                            {"label": "降序 ↓", "value": "desc"},
-                        ],
-                        value="asc",
-                        className="mb-3"
-                    ),
-                ]),
-                html.Div([
-                    dcc.Dropdown(
-                        id={"type": "sort-column", "index": 1},
-                        options=[{"label": col, "value": col} for col in columns],
-                        placeholder="第二排序列（可选）",
-                        className="mb-2"
-                    ),
-                    dcc.Dropdown(
-                        id={"type": "sort-order", "index": 1},
-                        options=[
-                            {"label": "升序 ↑", "value": "asc"},
-                            {"label": "降序 ↓", "value": "desc"},
-                        ],
-                        value="asc",
-                        className="mb-3"
-                    ),
-                ]),
-                html.Div([
-                    dcc.Dropdown(
-                        id={"type": "sort-column", "index": 2},
-                        options=[{"label": col, "value": col} for col in columns],
-                        placeholder="第三排序列（可选）",
-                        className="mb-2"
-                    ),
-                    dcc.Dropdown(
-                        id={"type": "sort-order", "index": 2},
-                        options=[
-                            {"label": "升序 ↑", "value": "asc"},
-                            {"label": "降序 ↓", "value": "desc"},
-                        ],
-                        value="asc",
-                    ),
-                ]),
-            ])
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-sort", color="secondary", size="sm"),
-            dbc.Button("应用排序", id="btn-confirm-sort", color="primary", size="sm"),
-        ]),
-    ], id="sort-modal", is_open=True, size="lg")
-
-
-# 去重模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-remove-duplicates", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_dedup_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    columns = df.columns.tolist()
-    total_rows = len(df)
-    duplicate_rows = df.duplicated().sum()
-
-    return dbc.Modal([
-        dbc.ModalHeader("去重"),
-        dbc.ModalBody([
-            dbc.Alert([
-                html.Strong(f"当前数据集：{total_rows:,} 行"),
-                html.Br(),
-                f"重复行数：{duplicate_rows:,} ({duplicate_rows/total_rows*100:.2f}%)" if duplicate_rows > 0 else "没有发现重复行"
-            ], color="info" if duplicate_rows > 0 else "success"),
-            html.Br(),
-            html.Label("判断依据列（留空则使用所有列）："),
-            dcc.Dropdown(
-                id="dedup-columns-select",
-                options=[{"label": col, "value": col} for col in columns],
-                placeholder="选择用于判断重复的列",
-                multi=True
-            ),
-            html.Br(),
-            html.Label("保留策略："),
-            dcc.Dropdown(
-                id="dedup-keep-strategy",
-                options=[
-                    {"label": "保留第一个", "value": "first"},
-                    {"label": "保留最后一个", "value": "last"},
-                    {"label": "删除所有重复", "value": False},
-                ],
-                value="first",
-                placeholder="选择保留策略"
-            ),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-dedup", color="secondary", size="sm"),
-            dbc.Button("确认去重", id="btn-confirm-dedup", color="warning", size="sm"),
-        ]),
-    ], id="dedup-modal", is_open=True, size="lg")
-
-
-# 确认筛选
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "children", allow_duplicate=True)],
-    Input("btn-confirm-filter", "n_clicks"),
-    [State("filter-column-select", "value"),
-     State("filter-operator-select", "value"),
-     State("filter-value-input", "value"),
-     State("operation-history", "children")],
-    prevent_initial_call=True
-)
-def confirm_filter(n_clicks, column, operator, value, current_history):
-    if not n_clicks or not column or not operator or value is None:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        # 应用筛选
-        original_count = len(df)
-
-        if operator == "eq":
-            mask = df[column] == value
-        elif operator == "ne":
-            mask = df[column] != value
-        elif operator == "gt":
-            mask = df[column] > float(value)
-        elif operator == "ge":
-            mask = df[column] >= float(value)
-        elif operator == "lt":
-            mask = df[column] < float(value)
-        elif operator == "le":
-            mask = df[column] <= float(value)
-        elif operator == "contains":
-            mask = df[column].astype(str).str.contains(str(value), na=False)
-        elif operator == "not_contains":
-            mask = ~df[column].astype(str).str.contains(str(value), na=False)
-        elif operator == "startswith":
-            mask = df[column].astype(str).str.startswith(str(value), na=False)
-        elif operator == "endswith":
-            mask = df[column].astype(str).str.endswith(str(value), na=False)
-        else:
-            return html.P("不支持的操作符", className="text-danger"), None, current_history
-
-        filtered_df = df[mask]
-        filtered_count = len(filtered_df)
-
-        # 更新数据管理器
-        data_manager.active_df = filtered_df
-
-        # 添加到操作历史
-        operator_labels = {
-            "eq": "=", "ne": "≠", "gt": ">", "ge": "≥", "lt": "<", "le": "≤",
-            "contains": "包含", "not_contains": "不包含",
-            "startswith": "开头", "endswith": "结尾"
-        }
-        op_label = operator_labels.get(operator, operator)
-        new_history = add_operation_to_history(
-            current_history,
-            f"筛选数据：{column} {op_label} {value}",
-            f"{original_count:,} → {filtered_count:,} 行"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 筛选完成"),
-                html.Br(),
-                f"原始行数：{original_count:,}",
-                html.Br(),
-                f"筛选后：{filtered_count:,} 行",
-                html.Br(),
-                f"保留比例：{filtered_count/original_count*100:.2f}%"
-            ], color="success"),
-            html.H5("筛选后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                filtered_df.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
+    elif op_type == 'type_conversion':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=6),
+                dbc.Col([
+                    html.Label("目标类型", className="form-label"),
+                    dcc.Dropdown(id='modal-param-target-type', options=[
+                        {'label': '整数 (int)', 'value': 'int'},
+                        {'label': '浮点数 (float)', 'value': 'float'},
+                        {'label': '字符串 (str)', 'value': 'str'},
+                        {'label': '日期时间 (datetime)', 'value': 'datetime'},
+                        {'label': '布尔 (bool)', 'value': 'bool'},
+                    ], placeholder="选择目标类型"),
+                ], width=6),
+            ]),
         ])
 
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"筛选失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 确认排序
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "children", allow_duplicate=True)],
-    Input("btn-confirm-sort", "n_clicks"),
-    [State({"type": "sort-column", "index": ALL}, "value"),
-     State({"type": "sort-order", "index": ALL}, "value"),
-     State("operation-history", "children")],
-    prevent_initial_call=True
-)
-def confirm_sort(n_clicks, columns, orders, current_history):
-    if not n_clicks:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        # 过滤出有效的排序列
-        sort_columns = []
-        sort_orders = []
-        for col, order in zip(columns, orders):
-            if col:
-                sort_columns.append(col)
-                sort_orders.append(order == "asc")
-
-        if not sort_columns:
-            return html.P("请至少选择一个排序列", className="text-warning"), None, current_history
-
-        # 应用排序
-        sorted_df = df.sort_values(by=sort_columns, ascending=sort_orders)
-
-        # 更新数据管理器
-        data_manager.active_df = sorted_df
-
-        # 添加到操作历史
-        sort_desc = ', '.join([f"{col}({'升序' if asc else '降序'})" for col, asc in zip(sort_columns, sort_orders)])
-        new_history = add_operation_to_history(
-            current_history,
-            f"排序数据：{sort_desc}",
-            f"{len(sorted_df):,} 行"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 排序完成"),
-                html.Br(),
-                f"排序列：{', '.join(sort_columns)}",
-                html.Br(),
-                f"排序方式：{', '.join(['升序' if asc else '降序' for asc in sort_orders])}"
-            ], color="success"),
-            html.H5("排序后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                sorted_df.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
+    elif op_type == 'fill_missing':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("填充方法", className="form-label"),
+                    dcc.Dropdown(id='modal-param-method', options=[
+                        {'label': '均值', 'value': 'mean'},
+                        {'label': '中位数', 'value': 'median'},
+                        {'label': '众数', 'value': 'mode'},
+                        {'label': '前向填充', 'value': 'ffill'},
+                        {'label': '后向填充', 'value': 'bfill'},
+                        {'label': '固定值', 'value': 'value'},
+                    ], placeholder="选择方法"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("固定值（仅固定值方法）", className="form-label"),
+                    dbc.Input(id='modal-param-fill-value', type='text', placeholder="输入固定值"),
+                ], width=4),
+            ]),
         ])
 
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"排序失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 确认去重
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "children", allow_duplicate=True)],
-    Input("btn-confirm-dedup", "n_clicks"),
-    [State("dedup-columns-select", "value"),
-     State("dedup-keep-strategy", "value"),
-     State("operation-history", "children")],
-    prevent_initial_call=True
-)
-def confirm_dedup(n_clicks, columns, keep, current_history):
-    if not n_clicks:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        original_count = len(df)
-
-        # 应用去重
-        if columns:
-            deduped_df = df.drop_duplicates(subset=columns, keep=keep)
-        else:
-            deduped_df = df.drop_duplicates(keep=keep)
-
-        deduped_count = len(deduped_df)
-        removed_count = original_count - deduped_count
-
-        # 更新数据管理器
-        data_manager.active_df = deduped_df
-
-        # 添加到操作历史
-        col_desc = f"基于 {', '.join(columns)}" if columns else "所有列"
-        new_history = add_operation_to_history(
-            current_history,
-            f"去重：{col_desc}",
-            f"{original_count:,} → {deduped_count:,} 行 (删除 {removed_count:,})"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 去重完成"),
-                html.Br(),
-                f"原始行数：{original_count:,}",
-                html.Br(),
-                f"去重后：{deduped_count:,} 行",
-                html.Br(),
-                f"删除了 {removed_count:,} 行重复数据 ({removed_count/original_count*100:.2f}%)"
-            ], color="success"),
-            html.H5("去重后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                deduped_df.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
+    elif op_type == 'drop_duplicates':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("子集列（可选，多选）", className="form-label"),
+                    dcc.Dropdown(id='modal-param-columns-multi', options=col_options, multi=True,
+                               placeholder="留空则对所有列去重"),
+                ], width=8),
+                dbc.Col([
+                    html.Label("保留策略", className="form-label"),
+                    dcc.Dropdown(id='modal-param-keep', options=[
+                        {'label': '保留第一个', 'value': 'first'},
+                        {'label': '保留最后一个', 'value': 'last'},
+                    ], value='first', clearable=False),
+                ], width=4),
+            ]),
         ])
 
-        return result, None, new_history
+    elif op_type == 'split_column':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择要拆分的列"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("分隔符", className="form-label"),
+                    dbc.Input(id='modal-param-delimiter', type='text', placeholder='如: , 或 -'),
+                ], width=4),
+                dbc.Col([
+                    html.Label("最大拆分数", className="form-label"),
+                    dbc.Input(id='modal-param-max-split', type='number', value=-1, placeholder="-1为不限"),
+                ], width=4),
+            ]),
+        ])
 
-    except Exception as e:
-        return html.P(f"去重失败：{str(e)}", className="text-danger"), None, current_history
+    elif op_type == 'merge_columns':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择要合并的列（多选）", className="form-label"),
+                    dcc.Dropdown(id='modal-param-columns-multi', options=col_options, multi=True,
+                               placeholder="选择至少两列"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("分隔符", className="form-label"),
+                    dbc.Input(id='modal-param-delimiter', type='text', placeholder='如: _ 或 -', value='_'),
+                ], width=4),
+                dbc.Col([
+                    html.Label("新列名", className="form-label"),
+                    dbc.Input(id='modal-param-new-name', type='text', placeholder="输入新列名"),
+                ], width=4),
+            ]),
+        ])
+
+    elif op_type == 'replace_value':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("原始值", className="form-label"),
+                    dbc.Input(id='modal-param-old-value', type='text', placeholder="要替换的值"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("新值", className="form-label"),
+                    dbc.Input(id='modal-param-new-value', type='text', placeholder="替换为"),
+                ], width=4),
+            ]),
+        ])
+
+    elif op_type == 'strip_whitespace':
+        return html.Div([
+            html.Label("选择列", className="form-label"),
+            dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择要去除空格的列"),
+        ])
+
+    elif op_type == 'change_case':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=6),
+                dbc.Col([
+                    html.Label("转换方式", className="form-label"),
+                    dcc.Dropdown(id='modal-param-case-type', options=[
+                        {'label': '大写 (UPPER)', 'value': 'upper'},
+                        {'label': '小写 (lower)', 'value': 'lower'},
+                        {'label': '标题 (Title)', 'value': 'title'},
+                        {'label': '首字母大写', 'value': 'capitalize'},
+                    ], placeholder="选择转换方式"),
+                ], width=6),
+            ]),
+        ])
+
+    elif op_type == 'find_replace_regex':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=3),
+                dbc.Col([
+                    html.Label("查找模式", className="form-label"),
+                    dbc.Input(id='modal-param-pattern', type='text', placeholder="正则表达式或文本"),
+                ], width=3),
+                dbc.Col([
+                    html.Label("替换为", className="form-label"),
+                    dbc.Input(id='modal-param-replacement', type='text', placeholder="替换文本"),
+                ], width=3),
+                dbc.Col([
+                    html.Label("正则模式", className="form-label"),
+                    dcc.Dropdown(id='modal-param-is-regex', options=[
+                        {'label': '正则', 'value': 'true'},
+                        {'label': '文本', 'value': 'false'},
+                    ], value='true', clearable=False),
+                ], width=3),
+            ]),
+        ])
+
+    elif op_type == 'extract_substring':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("正则模式（优先）", className="form-label"),
+                    dbc.Input(id='modal-param-pattern', type='text', placeholder="如: \\d+"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("起始位置", className="form-label"),
+                    dbc.Input(id='modal-param-start', type='number', placeholder="0"),
+                ], width=2),
+                dbc.Col([
+                    html.Label("结束位置", className="form-label"),
+                    dbc.Input(id='modal-param-end', type='number', placeholder="空=末尾"),
+                ], width=2),
+            ]),
+            html.Small("提示：填写正则模式时忽略位置参数；留空正则时使用位置切片", className="text-muted"),
+        ])
+
+    elif op_type == 'bin_column':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列（数值型）", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=4),
+                dbc.Col([
+                    html.Label("分箱数", className="form-label"),
+                    dbc.Input(id='modal-param-bins', type='number', value=5, min=2),
+                ], width=4),
+                dbc.Col([
+                    html.Label("分箱方法", className="form-label"),
+                    dcc.Dropdown(id='modal-param-bin-method', options=[
+                        {'label': '等宽分箱', 'value': 'equal_width'},
+                        {'label': '等频分箱', 'value': 'equal_freq'},
+                    ], value='equal_width', clearable=False),
+                ], width=4),
+            ]),
+        ])
+
+    elif op_type == 'normalize':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列（数值型）", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
+                ], width=6),
+                dbc.Col([
+                    html.Label("标准化方法", className="form-label"),
+                    dcc.Dropdown(id='modal-param-norm-method', options=[
+                        {'label': 'Min-Max 归一化', 'value': 'minmax'},
+                        {'label': 'Z-Score 标准化', 'value': 'zscore'},
+                        {'label': 'Robust (中位/IQR)', 'value': 'robust'},
+                    ], value='minmax', clearable=False),
+                ], width=6),
+            ]),
+        ])
+
+    elif op_type == 'drop_missing_rows':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("指定列（可选）", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options,
+                               placeholder="留空=检查所有列", clearable=True),
+                ], width=4),
+                dbc.Col([
+                    html.Label("删除条件", className="form-label"),
+                    dcc.Dropdown(id='modal-param-how', options=[
+                        {'label': '任一缺失 (any)', 'value': 'any'},
+                        {'label': '全部缺失 (all)', 'value': 'all'},
+                    ], value='any', clearable=False),
+                ], width=4),
+                dbc.Col([
+                    html.Label("阈值（可选）", className="form-label"),
+                    dbc.Input(id='modal-param-threshold', type='number', placeholder="最少非空数"),
+                ], width=4),
+            ]),
+            html.Small("提示：设置阈值时将忽略删除条件", className="text-muted"),
+        ])
+
+    elif op_type == 'duplicate_column':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("选择列", className="form-label"),
+                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择要复制的列"),
+                ], width=6),
+                dbc.Col([
+                    html.Label("新列名", className="form-label"),
+                    dbc.Input(id='modal-param-new-name', type='text', placeholder="输入新列名"),
+                ], width=6),
+            ]),
+        ])
+
+    elif op_type == 'create_calculated':
+        return html.Div([
+            dbc.Row([
+                dbc.Col([
+                    html.Label("计算表达式", className="form-label"),
+                    dbc.Input(id='modal-param-expression', type='text',
+                             placeholder="如: salary * 1.1 或 col1 + col2"),
+                ], width=8),
+                dbc.Col([
+                    html.Label("新列名", className="form-label"),
+                    dbc.Input(id='modal-param-new-name', type='text', placeholder="calculated", value="calculated"),
+                ], width=4),
+            ]),
+            html.Small(f"可用列名: {', '.join(columns)}", className="text-muted d-block mt-2"),
+        ])
+
+    return html.Div("未知操作类型")
 
 
-# 更新流水线显示
+# ============================================================================
+# 回调：加载数据（示例数据或从 DataManager）
+# ============================================================================
+
 @callback(
-    Output("pipeline-list", "children"),
-    Input("operation-history", "data")
-)
-def update_pipeline(operations):
-    """更新流水线显示"""
-    return update_pipeline_display(operations or [])
-
-
-# 导出代码
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-export-code", "n_clicks"),
-    State("operation-history", "data"),
+    Output('original-data-store', 'data'),
+    Output('data-table-container', 'children'),
+    Output('data-stats', 'children'),
+    Input('btn-load-sample', 'n_clicks'),
+    Input('dm-loaded', 'data'),
     prevent_initial_call=True
 )
-def export_code(n_clicks, operations):
-    """导出 Python 代码"""
-    if not n_clicks:
-        return None
+def load_data(n_clicks, dm_loaded):
+    """加载数据：优先从 DataManager，否则加载示例"""
+    triggered_id = ctx.triggered_id
 
-    # 清空并重建代码生成器
-    code_generator.clear_operations()
-    for op in (operations or []):
-        code_generator.add_operation(op)
+    if triggered_id == 'dm-loaded' and dm_loaded:
+        dm = DataManager()
+        df = dm.active_df
+        if df is not None and not df.empty:
+            table = create_data_grid(df, preview_mode=False)
+            stats = create_data_stats(df)
+            return df.to_json(date_format='iso', orient='split'), table, stats
+        return no_update, no_update, no_update
 
-    # 生成代码
-    code = code_generator.generate_code()
+    # 加载示例数据
+    df = pd.DataFrame({
+        'name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank', 'Grace', 'Henry'],
+        'age': ['25', '30', '35', '28', '32', '29', '31', '27'],
+        'city': ['NYC', 'LA', 'SF', 'NYC', 'LA', 'SF', 'NYC', 'LA'],
+        'salary': [50000, 60000, 75000, 55000, 65000, 58000, 62000, 53000],
+        'department': ['Sales', 'Engineering', 'Sales', 'Engineering', 'Sales', 'Engineering', 'Sales', 'Engineering']
+    })
 
-    # 创建代码显示模态框
-    modal = dbc.Modal([
-        dbc.ModalHeader(dbc.ModalTitle("导出 Python 代码")),
-        dbc.ModalBody([
-            html.Pre(code, style={
-                "backgroundColor": "#f5f5f5",
-                "padding": "15px",
-                "borderRadius": "5px",
-                "maxHeight": "500px",
-                "overflow": "auto",
-                "fontSize": "12px"
-            }),
-            dbc.Button("复制代码", id="btn-copy-code", color="primary", size="sm", className="mt-2"),
-            dcc.Clipboard(
-                target_id="btn-copy-code",
-                content=code,
-                style={"display": "inline-block", "marginLeft": "10px"}
-            )
-        ]),
-        dbc.ModalFooter(
-            dbc.Button("关闭", id="btn-close-export", color="secondary", size="sm")
-        ),
-    ], is_open=True, size="lg")
+    # 也存入 DataManager
+    dm = DataManager()
+    dm.add_dataset("示例数据", df, source="sample:demo")
 
-    return modal
+    table = create_data_grid(df, preview_mode=False)
+    stats = create_data_stats(df)
+    return df.to_json(date_format='iso', orient='split'), table, stats
 
 
-# 关闭导出模态框
+# ============================================================================
+# 回调：点击操作按钮 → 打开配置模态框
+# ============================================================================
+
 @callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-close-export", "n_clicks"),
+    Output('operation-modal', 'is_open'),
+    Output('operation-modal-title', 'children'),
+    Output('operation-modal-body', 'children'),
+    Output('pending-operation-type', 'data'),
+    # 所有操作按钮作为 Input
+    Input('btn-filter', 'n_clicks'),
+    Input('btn-drop-column', 'n_clicks'),
+    Input('btn-rename-column', 'n_clicks'),
+    Input('btn-sort', 'n_clicks'),
+    Input('btn-type-convert', 'n_clicks'),
+    Input('btn-fill-missing', 'n_clicks'),
+    Input('btn-drop-duplicates', 'n_clicks'),
+    Input('btn-split-column', 'n_clicks'),
+    Input('btn-merge-columns', 'n_clicks'),
+    Input('btn-replace-value', 'n_clicks'),
+    Input('btn-strip-whitespace', 'n_clicks'),
+    Input('btn-change-case', 'n_clicks'),
+    Input('btn-regex-replace', 'n_clicks'),
+    Input('btn-extract-substring', 'n_clicks'),
+    Input('btn-bin-column', 'n_clicks'),
+    Input('btn-normalize', 'n_clicks'),
+    Input('btn-drop-missing-rows', 'n_clicks'),
+    Input('btn-duplicate-column', 'n_clicks'),
+    Input('btn-create-calculated', 'n_clicks'),
+    Input('btn-modal-cancel', 'n_clicks'),
+    State('original-data-store', 'data'),
+    State('preview-data-store', 'data'),
     prevent_initial_call=True
 )
-def close_export_modal(n_clicks):
-    return None
+def open_operation_modal(*args):
+    """点击操作按钮时弹出配置表单"""
+    triggered_id = ctx.triggered_id
+
+    if triggered_id == 'btn-modal-cancel':
+        return False, "", [], None
+
+    if triggered_id not in OPERATION_BUTTONS:
+        return no_update, no_update, no_update, no_update
+
+    # 获取原始数据中的列名
+    original_data = args[-2]  # State: original-data-store
+    preview_data = args[-1]   # State: preview-data-store
+
+    # 使用最新的预览数据，以便列名反映已执行的操作
+    data_to_use = preview_data or original_data
+    columns = _get_columns_from_store(data_to_use)
+
+    if not columns:
+        return True, "提示", html.Div([
+            dbc.Alert("请先加载数据", color="warning"),
+        ]), None
+
+    op_type, op_name = OPERATION_BUTTONS[triggered_id]
+    form = _build_form_for_operation(op_type, columns)
+
+    return True, f"配置 — {op_name}", form, op_type
 
 
-# 清空流水线
+# ============================================================================
+# 回调：应用操作（模态框"应用"按钮）
+# ============================================================================
+
 @callback(
-    Output("operation-history", "data", allow_duplicate=True),
-    Input("btn-clear-pipeline", "n_clicks"),
+    Output('operation-modal', 'is_open', allow_duplicate=True),
+    Output('pipeline-store', 'data'),
+    Output('preview-data-store', 'data'),
+    Output('data-table-container', 'children', allow_duplicate=True),
+    Output('data-stats', 'children', allow_duplicate=True),
+    Output('undo-redo-store', 'data'),
+    Input('btn-modal-apply', 'n_clicks'),
+    State('pending-operation-type', 'data'),
+    State('original-data-store', 'data'),
+    State('pipeline-store', 'data'),
+    # 所有可能的表单字段（统一ID方式）
+    State('modal-param-column', 'value'),
+    State('modal-param-operator', 'value'),
+    State('modal-param-value', 'value'),
+    State('modal-param-columns-multi', 'value'),
+    State('modal-param-new-name', 'value'),
+    State('modal-param-ascending', 'value'),
+    State('modal-param-target-type', 'value'),
+    State('modal-param-method', 'value'),
+    State('modal-param-fill-value', 'value'),
+    State('modal-param-keep', 'value'),
+    State('modal-param-delimiter', 'value'),
+    State('modal-param-max-split', 'value'),
+    State('modal-param-old-value', 'value'),
+    State('modal-param-new-value', 'value'),
+    State('modal-param-case-type', 'value'),
+    State('modal-param-pattern', 'value'),
+    State('modal-param-replacement', 'value'),
+    State('modal-param-is-regex', 'value'),
+    State('modal-param-start', 'value'),
+    State('modal-param-end', 'value'),
+    State('modal-param-bins', 'value'),
+    State('modal-param-bin-method', 'value'),
+    State('modal-param-norm-method', 'value'),
+    State('modal-param-how', 'value'),
+    State('modal-param-threshold', 'value'),
+    State('modal-param-expression', 'value'),
     prevent_initial_call=True
 )
-def clear_pipeline(n_clicks):
-    """清空操作流水线"""
-    if not n_clicks:
-        return []
-    code_generator.clear_operations()
-    return []
+def apply_operation(
+    apply_clicks, op_type, original_data, current_pipeline,
+    column, operator, value, columns_multi, new_name,
+    ascending, target_type, method, fill_value, keep,
+    delimiter, max_split, old_value, new_value,
+    case_type, pattern, replacement, is_regex,
+    start, end, bins, bin_method, norm_method,
+    how, threshold, expression
+):
+    """在用户填写参数后执行操作"""
+    if not op_type or not original_data:
+        return no_update, no_update, no_update, no_update, no_update, no_update
 
+    # 根据操作类型构建参数
+    params = _build_params(
+        op_type, column, operator, value, columns_multi, new_name,
+        ascending, target_type, method, fill_value, keep,
+        delimiter, max_split, old_value, new_value,
+        case_type, pattern, replacement, is_regex,
+        start, end, bins, bin_method, norm_method,
+        how, threshold, expression
+    )
 
-# 撤销操作
-@callback(
-    Output("operation-history", "data", allow_duplicate=True),
-    Output("operation-index", "data", allow_duplicate=True),
-    Input("btn-undo", "n_clicks"),
-    State("operation-history", "data"),
-    State("operation-index", "data"),
-    prevent_initial_call=True
-)
-def undo_operation(n_clicks, operations, current_index):
-    """撤销操作"""
-    if not n_clicks or not operations:
-        return operations or [], current_index or -1
+    if params is None:
+        return no_update, no_update, no_update, no_update, no_update, no_update
 
-    # 如果当前索引是-1，表示在最新状态，设置为倒数第二个
-    if current_index == -1:
-        new_index = len(operations) - 2
-    else:
-        new_index = max(-1, current_index - 1)
-
-    return operations, new_index
-
-
-# 重做操作
-@callback(
-    Output("operation-history", "data", allow_duplicate=True),
-    Output("operation-index", "data", allow_duplicate=True),
-    Input("btn-redo", "n_clicks"),
-    State("operation-history", "data"),
-    State("operation-index", "data"),
-    prevent_initial_call=True
-)
-def redo_operation(n_clicks, operations, current_index):
-    """重做操作"""
-    if not n_clicks or not operations:
-        return operations or [], current_index or -1
-
-    # 如果已经在最新状态，不能重做
-    if current_index >= len(operations) - 1:
-        return operations, current_index
-
-    new_index = min(len(operations) - 1, current_index + 1)
-    return operations, new_index
-
-
-# 移除单个操作
-@callback(
-    Output("operation-history", "data", allow_duplicate=True),
-    Input({"type": "remove-operation", "index": ALL}, "n_clicks"),
-    State("operation-history", "data"),
-    prevent_initial_call=True
-)
-def remove_operation(n_clicks_list, operations):
-    """移除单个操作"""
-    if not any(n_clicks_list) or not operations:
-        return operations or []
-
-    # 找到被点击的按钮索引
-    clicked_index = None
-    for i, n_clicks in enumerate(n_clicks_list):
-        if n_clicks:
-            clicked_index = i
-            break
-
-    if clicked_index is not None and 0 <= clicked_index < len(operations):
-        operations = operations.copy()
-        operations.pop(clicked_index)
-
-    return operations
-
-
-# 辅助函数：添加操作到历史
-def add_operation_to_history(current_history, description, details):
-    """添加操作到历史记录"""
-    if current_history is None:
-        current_history = []
-
+    # 创建操作记录
     operation = {
-        'description': description,
-        'details': details,
-        'timestamp': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
+        'step_id': str(uuid.uuid4()),
+        'operation': op_type,
+        'params': params,
+        'timestamp': datetime.now().isoformat()
     }
 
-    new_history = current_history.copy() if isinstance(current_history, list) else []
-    new_history.append(operation)
+    # 添加到 pipeline
+    new_pipeline = current_pipeline.copy() if current_pipeline else []
+    new_pipeline.append(operation)
 
-    return new_history
+    # 计算预览
+    df = pd.read_json(original_data, orient='split')
+    result = preview_engine.compute_preview(df, new_pipeline)
 
+    if 'error' in result:
+        return no_update, no_update, no_update, no_update, no_update, no_update
 
-# 拆分列模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-split-column", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_split_column_modal(n_clicks):
-    if not n_clicks:
-        return None
+    operation['affected_rows'] = result.get('affected_rows', 0)
+    operation['affected_cols'] = result.get('affected_cols', 0)
+    operation['execution_time'] = result.get('execution_time', 0)
 
-    data_manager = DataManager()
-    df = data_manager.active_df
+    # 保存撤销状态
+    undo_stack.push_state({
+        'pipeline': new_pipeline.copy(),
+        'timestamp': datetime.now().isoformat()
+    })
 
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
+    preview_df = result['preview_df']
+    table = create_data_grid(preview_df, preview_mode=True)
+    stats = create_data_stats(preview_df)
 
-    columns = df.columns.tolist()
+    undo_redo_state = {
+        'can_undo': undo_stack.can_undo(),
+        'can_redo': undo_stack.can_redo()
+    }
 
-    return dbc.Modal([
-        dbc.ModalHeader("拆分列"),
-        dbc.ModalBody([
-            html.Label("选择要拆分的列："),
-            dcc.Dropdown(
-                id="split-column-select",
-                options=[{"label": col, "value": col} for col in columns],
-                placeholder="选择列"
-            ),
-            html.Br(),
-            html.Label("分隔符："),
-            dbc.Input(id="split-delimiter-input", placeholder="例如: , 或 - 或空格", value=","),
-            html.Br(),
-            html.Label("新列名（可选，用逗号分隔）："),
-            dbc.Input(id="split-new-names-input", placeholder="例如: 列1,列2,列3"),
-            html.Br(),
-            html.Div(id="split-preview-info", className="text-muted small"),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-split", color="secondary", size="sm"),
-            dbc.Button("确认拆分", id="btn-confirm-split", color="primary", size="sm"),
-        ]),
-    ], id="split-column-modal", is_open=True, size="lg")
+    return False, new_pipeline, preview_df.to_json(orient='split'), table, stats, undo_redo_state
 
 
-# 确认拆分列
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-split", "n_clicks"),
-    [State("split-column-select", "value"),
-     State("split-delimiter-input", "value"),
-     State("split-new-names-input", "value"),
-     State("operation-history", "data")],
-    prevent_initial_call=True
-)
-def confirm_split_column(n_clicks, column, delimiter, new_names, current_history):
-    if not n_clicks or not column or not delimiter:
-        return None, None, current_history
+def _build_params(
+    op_type, column, operator, value, columns_multi, new_name,
+    ascending, target_type, method, fill_value, keep,
+    delimiter, max_split, old_value, new_value,
+    case_type, pattern, replacement, is_regex,
+    start, end, bins, bin_method, norm_method,
+    how, threshold, expression
+):
+    """根据操作类型从表单字段值构建参数字典"""
 
-    data_manager = DataManager()
-    df = data_manager.active_df
+    if op_type == 'filter':
+        if not column or not operator:
+            return None
+        return {'column': column, 'operator': operator, 'value': value or ''}
 
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
+    elif op_type == 'drop_column':
+        if not columns_multi:
+            return None
+        return {'columns': columns_multi}
 
-    try:
-        from services.data_cleaner import DataCleaner
+    elif op_type == 'rename_column':
+        if not column or not new_name:
+            return None
+        return {'old_name': column, 'new_name': new_name}
 
-        # 处理新列名
-        new_columns = None
-        if new_names and new_names.strip():
-            new_columns = [name.strip() for name in new_names.split(',')]
+    elif op_type == 'sort':
+        if not column:
+            return None
+        return {'column': column, 'ascending': ascending == 'true'}
 
-        # 拆分列
-        df_new = DataCleaner.split_column(df, column, delimiter, new_columns)
-        data_manager.active_df = df_new
+    elif op_type == 'type_conversion':
+        if not column or not target_type:
+            return None
+        return {'column': column, 'target_type': target_type}
 
-        # 添加到操作历史
-        new_history = add_operation_to_history(
-            current_history,
-            f"拆分列：{column}",
-            f"使用分隔符 '{delimiter}'"
-        )
+    elif op_type == 'fill_missing':
+        if not column or not method:
+            return None
+        params = {'column': column, 'method': method}
+        if method == 'value':
+            params['value'] = fill_value or 0
+        return params
 
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 列拆分完成"),
-                html.Br(),
-                f"原列：{column}",
-                html.Br(),
-                f"分隔符：'{delimiter}'"
-            ], color="success"),
-            html.H5("拆分后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
-        ])
+    elif op_type == 'drop_duplicates':
+        params = {'keep': keep or 'first'}
+        if columns_multi:
+            params['subset'] = columns_multi
+        return params
 
-        return result, None, new_history
+    elif op_type == 'split_column':
+        if not column or not delimiter:
+            return None
+        params = {'column': column, 'delimiter': delimiter}
+        if max_split is not None:
+            params['max_split'] = int(max_split)
+        return params
 
-    except Exception as e:
-        return html.P(f"拆分列失败：{str(e)}", className="text-danger"), None, current_history
+    elif op_type == 'merge_columns':
+        if not columns_multi or len(columns_multi) < 2:
+            return None
+        params = {'columns': columns_multi, 'delimiter': delimiter or '_'}
+        if new_name:
+            params['new_column'] = new_name
+        return params
 
+    elif op_type == 'replace_value':
+        if not column:
+            return None
+        return {'column': column, 'old_value': old_value or '', 'new_value': new_value or ''}
 
-# 合并列模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-merge-columns", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_merge_columns_modal(n_clicks):
-    if not n_clicks:
-        return None
+    elif op_type == 'strip_whitespace':
+        if not column:
+            return None
+        return {'column': column}
 
-    data_manager = DataManager()
-    df = data_manager.active_df
+    elif op_type == 'change_case':
+        if not column or not case_type:
+            return None
+        return {'column': column, 'case_type': case_type}
 
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
+    elif op_type == 'find_replace_regex':
+        if not column or not pattern:
+            return None
+        return {
+            'column': column,
+            'pattern': pattern,
+            'replacement': replacement or '',
+            'is_regex': is_regex == 'true',
+        }
 
-    columns = df.columns.tolist()
+    elif op_type == 'extract_substring':
+        if not column:
+            return None
+        params = {'column': column}
+        if pattern:
+            params['pattern'] = pattern
+        else:
+            params['start'] = start or 0
+            params['end'] = end
+        return params
 
-    return dbc.Modal([
-        dbc.ModalHeader("合并列"),
-        dbc.ModalBody([
-            html.Label("选择要合并的列："),
-            dcc.Dropdown(
-                id="merge-columns-select",
-                options=[{"label": col, "value": col} for col in columns],
-                placeholder="选择多个列",
-                multi=True
-            ),
-            html.Br(),
-            html.Label("新列名："),
-            dbc.Input(id="merge-new-name-input", placeholder="输入新列名"),
-            html.Br(),
-            html.Label("分隔符："),
-            dbc.Input(id="merge-delimiter-input", placeholder="例如: 空格 或 - 或 ,", value=" "),
-            html.Br(),
-            html.Div(id="merge-preview-info", className="text-muted small"),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-merge", color="secondary", size="sm"),
-            dbc.Button("确认合并", id="btn-confirm-merge", color="primary", size="sm"),
-        ]),
-    ], id="merge-columns-modal", is_open=True, size="lg")
+    elif op_type == 'bin_column':
+        if not column:
+            return None
+        return {
+            'column': column,
+            'bins': bins or 5,
+            'method': bin_method or 'equal_width',
+        }
 
+    elif op_type == 'normalize':
+        if not column:
+            return None
+        return {'column': column, 'method': norm_method or 'minmax'}
 
-# 确认合并列
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-merge", "n_clicks"),
-    [State("merge-columns-select", "value"),
-     State("merge-new-name-input", "value"),
-     State("merge-delimiter-input", "value"),
-     State("operation-history", "data")],
-    prevent_initial_call=True
-)
-def confirm_merge_columns(n_clicks, columns, new_name, delimiter, current_history):
-    if not n_clicks or not columns or not new_name:
-        return None, None, current_history
+    elif op_type == 'drop_missing_rows':
+        params = {'how': how or 'any'}
+        if column:
+            params['column'] = column
+        if threshold is not None and threshold != '':
+            params['threshold'] = int(threshold)
+        return params
 
-    data_manager = DataManager()
-    df = data_manager.active_df
+    elif op_type == 'duplicate_column':
+        if not column:
+            return None
+        return {'column': column, 'new_name': new_name or f"{column}_copy"}
 
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
+    elif op_type == 'create_calculated':
+        if not expression:
+            return None
+        return {'expression': expression, 'new_column': new_name or 'calculated'}
 
-    try:
-        from services.data_cleaner import DataCleaner
-
-        # 合并列
-        df_new = DataCleaner.merge_columns(df, columns, new_name, delimiter)
-        data_manager.active_df = df_new
-
-        # 添加到操作历史
-        new_history = add_operation_to_history(
-            current_history,
-            f"合并列：{', '.join(columns)} → {new_name}",
-            f"使用分隔符 '{delimiter}'"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 列合并完成"),
-                html.Br(),
-                f"合并列：{', '.join(columns)}",
-                html.Br(),
-                f"新列名：{new_name}",
-                html.Br(),
-                f"分隔符：'{delimiter}'"
-            ], color="success"),
-            html.H5("合并后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
-        ])
-
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"合并列失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 更新关闭模态框回调（添加新的取消按钮）
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    [Input("btn-cancel-split", "n_clicks"),
-     Input("btn-cancel-merge", "n_clicks"),
-     Input("btn-cancel-calc", "n_clicks")],
-    prevent_initial_call=True
-)
-def close_split_merge_modals(*args):
     return None
 
 
-# 新增计算列模态框
+# ============================================================================
+# 回调：应用到数据集（写回 DataManager）
+# ============================================================================
+
 @callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-add-calc-column", "n_clicks"),
+    Output('apply-dataset-status', 'children'),
+    Input('btn-apply-to-dataset', 'n_clicks'),
+    State('preview-data-store', 'data'),
+    State('original-data-store', 'data'),
     prevent_initial_call=True
 )
-def show_calc_column_modal(n_clicks):
-    if not n_clicks:
-        return None
+def apply_to_dataset(n_clicks, preview_data, original_data):
+    """将清洗结果写回 DataManager"""
+    data_to_use = preview_data or original_data
+    if not data_to_use:
+        return "无数据"
 
-    data_manager = DataManager()
-    df = data_manager.active_df
+    df = pd.read_json(data_to_use, orient='split')
+    dm = DataManager()
 
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
+    if dm.active_name:
+        dm.update_active_dataset(df, snapshot=True)
+    else:
+        dm.add_dataset("清洗结果", df, source="workshop")
 
-    columns = df.columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("新增计算列"),
-        dbc.ModalBody([
-            html.Label("新列名："),
-            dbc.Input(id="calc-column-name-input", placeholder="输入新列名"),
-            html.Br(),
-            html.Label("计算表达式："),
-            dbc.Textarea(
-                id="calc-expression-input",
-                placeholder="例如: column1 + column2\n或: column1 * 2\n或: column1 / column2",
-                style={"height": "100px"}
-            ),
-            html.Br(),
-            dbc.Alert([
-                html.Strong("提示："),
-                html.Br(),
-                "• 直接使用列名进行计算",
-                html.Br(),
-                "• 支持 +, -, *, / 等运算符",
-                html.Br(),
-                f"• 可用列名：{', '.join(columns[:5])}{'...' if len(columns) > 5 else ''}"
-            ], color="info", className="small"),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-calc", color="secondary", size="sm"),
-            dbc.Button("确认添加", id="btn-confirm-calc", color="success", size="sm"),
-        ]),
-    ], id="calc-column-modal", is_open=True, size="lg")
+    return "已应用"
 
 
-# 确认添加计算列
+# ============================================================================
+# 回调：更新步骤列表
+# ============================================================================
+
 @callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-calc", "n_clicks"),
-    [State("calc-column-name-input", "value"),
-     State("calc-expression-input", "value"),
-     State("operation-history", "data")],
+    Output('step-list', 'children'),
+    Output('step-header', 'children'),
+    Output('btn-clear-steps', 'disabled'),
+    Input('pipeline-store', 'data'),
+)
+def update_step_list(pipeline):
+    """更新步骤列表显示"""
+    if not pipeline:
+        return create_step_panel([]), create_step_header(0), True
+
+    step_panel = create_step_panel(pipeline, step_manager)
+    header = create_step_header(len(pipeline))
+
+    return step_panel, header, False
+
+
+# ============================================================================
+# 回调：更新撤销重做按钮状态
+# ============================================================================
+
+@callback(
+    Output('btn-undo', 'disabled'),
+    Output('btn-redo', 'disabled'),
+    Input('undo-redo-store', 'data'),
+)
+def update_undo_redo_buttons(undo_redo_state):
+    """更新撤销重做按钮状态"""
+    return not undo_redo_state['can_undo'], not undo_redo_state['can_redo']
+
+
+# ============================================================================
+# 回调：撤销重做
+# ============================================================================
+
+@callback(
+    Output('pipeline-store', 'data', allow_duplicate=True),
+    Output('preview-data-store', 'data', allow_duplicate=True),
+    Output('data-table-container', 'children', allow_duplicate=True),
+    Output('data-stats', 'children', allow_duplicate=True),
+    Output('undo-redo-store', 'data', allow_duplicate=True),
+    Input('btn-undo', 'n_clicks'),
+    Input('btn-redo', 'n_clicks'),
+    State('original-data-store', 'data'),
     prevent_initial_call=True
 )
-def confirm_calc_column(n_clicks, new_column, expression, current_history):
-    if not n_clicks or not new_column or not expression:
-        return None, None, current_history
+def handle_undo_redo(undo_clicks, redo_clicks, original_data):
+    """处理撤销重做操作"""
+    if not original_data:
+        return no_update, no_update, no_update, no_update, no_update
 
-    data_manager = DataManager()
-    df = data_manager.active_df
+    triggered_id = ctx.triggered_id
 
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
+    if triggered_id == 'btn-undo':
+        state = undo_stack.undo()
+    elif triggered_id == 'btn-redo':
+        state = undo_stack.redo()
+    else:
+        return no_update, no_update, no_update, no_update, no_update
 
-    try:
-        from services.data_cleaner import DataCleaner
+    if not state:
+        return no_update, no_update, no_update, no_update, no_update
 
-        # 添加计算列
-        df_new = DataCleaner.add_calculated_column(df, new_column, expression)
-        data_manager.active_df = df_new
+    pipeline = state.get('pipeline', [])
 
-        # 添加到操作历史
-        new_history = add_operation_to_history(
-            current_history,
-            f"新增计算列：{new_column}",
-            f"表达式：{expression}"
-        )
+    df = pd.read_json(original_data, orient='split')
 
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 计算列添加完成"),
-                html.Br(),
-                f"新列名：{new_column}",
-                html.Br(),
-                f"表达式：{expression}"
-            ], color="success"),
-            html.H5("更新后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
+    if pipeline:
+        result = preview_engine.compute_preview(df, pipeline)
+        if 'error' in result:
+            return no_update, no_update, no_update, no_update, no_update
+        preview_df = result['preview_df']
+    else:
+        preview_df = df
+
+    table = create_data_grid(preview_df, preview_mode=True)
+    stats = create_data_stats(preview_df)
+
+    undo_redo_state = {
+        'can_undo': undo_stack.can_undo(),
+        'can_redo': undo_stack.can_redo()
+    }
+
+    return pipeline, preview_df.to_json(orient='split'), table, stats, undo_redo_state
+
+
+# ============================================================================
+# 回调：代码生成
+# ============================================================================
+
+@callback(
+    Output('code-preview-modal', 'is_open'),
+    Output('code-display-area', 'children'),
+    Input('btn-view-code', 'n_clicks'),
+    Input('btn-close-code-modal', 'n_clicks'),
+    State('pipeline-store', 'data'),
+    State('code-preview-modal', 'is_open'),
+    prevent_initial_call=True
+)
+def handle_code_preview(view_clicks, close_clicks, pipeline, is_open):
+    """处理代码预览"""
+    triggered_id = ctx.triggered_id
+
+    if triggered_id == 'btn-view-code':
+        if not pipeline:
+            code = "# 暂无操作\n# 请先执行一些数据操作"
+        else:
+            code = code_generator.generate_code(
+                pipeline,
+                data_source='data.csv',
+                include_imports=True,
+                include_comments=True
             )
-        ])
 
-        return result, None, new_history
+        from components.data_workshop.code_preview_panel import create_code_preview_panel
+        code_display = create_code_preview_panel(code, show_header=False)
+        return True, code_display
 
-    except Exception as e:
-        return html.P(f"添加计算列失败：{str(e)}", className="text-danger"), None, current_history
+    elif triggered_id == 'btn-close-code-modal':
+        return False, no_update
 
-
-# 常用模板模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-calc-templates", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_calc_templates_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    # 获取数值列
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-
-    templates = [
-        {"name": "百分比变化", "expr": "(new_value - old_value) / old_value * 100", "desc": "计算两列之间的百分比变化"},
-        {"name": "累计求和", "expr": "column.cumsum()", "desc": "计算累计和"},
-        {"name": "移动平均", "expr": "column.rolling(window=3).mean()", "desc": "计算3期移动平均"},
-        {"name": "标准化", "expr": "(column - column.mean()) / column.std()", "desc": "Z-score标准化"},
-        {"name": "归一化", "expr": "(column - column.min()) / (column.max() - column.min())", "desc": "Min-Max归一化"},
-    ]
-
-    return dbc.Modal([
-        dbc.ModalHeader("计算列模板"),
-        dbc.ModalBody([
-            html.P("选择一个模板快速创建计算列：", className="mb-3"),
-            html.Div([
-                dbc.Card([
-                    dbc.CardBody([
-                        html.H6(template["name"], className="card-title"),
-                        html.P(template["desc"], className="card-text small text-muted"),
-                        html.Code(template["expr"], className="small"),
-                    ])
-                ], className="mb-2")
-                for template in templates
-            ]),
-            html.Br(),
-            dbc.Alert([
-                html.Strong("提示："),
-                html.Br(),
-                "将模板中的列名替换为实际列名即可使用",
-                html.Br(),
-                f"可用数值列：{', '.join(numeric_cols[:5])}{'...' if len(numeric_cols) > 5 else ''}"
-            ], color="info", className="small"),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("关闭", id="btn-close-templates", color="secondary", size="sm"),
-        ]),
-    ], id="calc-templates-modal", is_open=True, size="lg")
-
-
-# 关闭模板模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-close-templates", "n_clicks"),
-    prevent_initial_call=True
-)
-def close_templates_modal(n_clicks):
-    return None
-
-
-# 去空格模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-strip-text", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_strip_text_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    # 获取文本列
-    text_cols = df.select_dtypes(include=['object']).columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("去除空格"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="strip-columns-select",
-                options=[{"label": col, "value": col} for col in text_cols],
-                placeholder="选择要处理的列",
-                multi=True
-            ),
-            html.Br(),
-            html.Label("去除方式："),
-            dcc.Dropdown(
-                id="strip-method-select",
-                options=[
-                    {"label": "去除两端空格", "value": "both"},
-                    {"label": "去除左侧空格", "value": "left"},
-                    {"label": "去除右侧空格", "value": "right"},
-                ],
-                value="both",
-                placeholder="选择去除方式"
-            ),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-strip", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-strip", color="primary", size="sm"),
-        ]),
-    ], id="strip-text-modal", is_open=True)
-
-
-# 确认去空格
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-strip", "n_clicks"),
-    [State("strip-columns-select", "value"),
-     State("strip-method-select", "value"),
-     State("operation-history", "data")],
-    prevent_initial_call=True
-)
-def confirm_strip_text(n_clicks, columns, method, current_history):
-    if not n_clicks or not columns:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        df_new = df.copy()
-
-        for col in columns:
-            if method == "both":
-                df_new[col] = df_new[col].str.strip()
-            elif method == "left":
-                df_new[col] = df_new[col].str.lstrip()
-            elif method == "right":
-                df_new[col] = df_new[col].str.rstrip()
-
-        data_manager.active_df = df_new
-
-        method_names = {"both": "两端", "left": "左侧", "right": "右侧"}
-        new_history = add_operation_to_history(
-            current_history,
-            f"去除空格：{', '.join(columns)}",
-            f"去除{method_names.get(method, method)}空格"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 空格去除完成"),
-                html.Br(),
-                f"处理列：{', '.join(columns)}",
-                html.Br(),
-                f"方式：去除{method_names.get(method, method)}空格"
-            ], color="success"),
-            html.H5("处理后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
-        ])
-
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"去除空格失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 大小写转换模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-case-convert", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_case_convert_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    text_cols = df.select_dtypes(include=['object']).columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("大小写转换"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="case-columns-select",
-                options=[{"label": col, "value": col} for col in text_cols],
-                placeholder="选择要处理的列",
-                multi=True
-            ),
-            html.Br(),
-            html.Label("转换方式："),
-            dcc.Dropdown(
-                id="case-method-select",
-                options=[
-                    {"label": "转为大写", "value": "upper"},
-                    {"label": "转为小写", "value": "lower"},
-                    {"label": "首字母大写", "value": "title"},
-                    {"label": "首字母大写其余小写", "value": "capitalize"},
-                ],
-                placeholder="选择转换方式"
-            ),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-case", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-case", color="primary", size="sm"),
-        ]),
-    ], id="case-convert-modal", is_open=True)
-
-
-# 确认大小写转换
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-case", "n_clicks"),
-    [State("case-columns-select", "value"),
-     State("case-method-select", "value"),
-     State("operation-history", "data")],
-    prevent_initial_call=True
-)
-def confirm_case_convert(n_clicks, columns, method, current_history):
-    if not n_clicks or not columns or not method:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        df_new = df.copy()
-
-        for col in columns:
-            if method == "upper":
-                df_new[col] = df_new[col].str.upper()
-            elif method == "lower":
-                df_new[col] = df_new[col].str.lower()
-            elif method == "title":
-                df_new[col] = df_new[col].str.title()
-            elif method == "capitalize":
-                df_new[col] = df_new[col].str.capitalize()
-
-        data_manager.active_df = df_new
-
-        method_names = {"upper": "大写", "lower": "小写", "title": "首字母大写", "capitalize": "句首大写"}
-        new_history = add_operation_to_history(
-            current_history,
-            f"大小写转换：{', '.join(columns)}",
-            f"转换为{method_names.get(method, method)}"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 大小写转换完成"),
-                html.Br(),
-                f"处理列：{', '.join(columns)}",
-                html.Br(),
-                f"方式：{method_names.get(method, method)}"
-            ], color="success"),
-            html.H5("处理后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
-        ])
-
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"大小写转换失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 查找替换模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-find-replace", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_find_replace_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    columns = df.columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("查找替换"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="replace-columns-select",
-                options=[{"label": col, "value": col} for col in columns],
-                placeholder="选择要处理的列",
-                multi=True
-            ),
-            html.Br(),
-            html.Label("查找内容："),
-            dbc.Input(id="replace-find-input", placeholder="输入要查找的内容"),
-            html.Br(),
-            html.Label("替换为："),
-            dbc.Input(id="replace-with-input", placeholder="输入替换后的内容"),
-            html.Br(),
-            dbc.Checklist(
-                id="replace-regex-check",
-                options=[{"label": "使用正则表达式", "value": "regex"}],
-                value=[]
-            ),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-replace", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-replace", color="primary", size="sm"),
-        ]),
-    ], id="find-replace-modal", is_open=True)
-
-
-# 确认查找替换
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-replace", "n_clicks"),
-    [State("replace-columns-select", "value"),
-     State("replace-find-input", "value"),
-     State("replace-with-input", "value"),
-     State("replace-regex-check", "value"),
-     State("operation-history", "data")],
-    prevent_initial_call=True
-)
-def confirm_find_replace(n_clicks, columns, find_text, replace_text, use_regex, current_history):
-    if not n_clicks or not columns or find_text is None:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        df_new = df.copy()
-        replace_text = replace_text if replace_text is not None else ""
-        is_regex = "regex" in use_regex
-
-        for col in columns:
-            df_new[col] = df_new[col].astype(str).str.replace(find_text, replace_text, regex=is_regex)
-
-        data_manager.active_df = df_new
-
-        new_history = add_operation_to_history(
-            current_history,
-            f"查找替换：{', '.join(columns)}",
-            f"'{find_text}' → '{replace_text}'"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 查找替换完成"),
-                html.Br(),
-                f"处理列：{', '.join(columns)}",
-                html.Br(),
-                f"查找：'{find_text}'",
-                html.Br(),
-                f"替换为：'{replace_text}'"
-            ], color="success"),
-            html.H5("处理后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new.head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
-        ])
-
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"查找替换失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 更新关闭模态框回调
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    [Input("btn-cancel-strip", "n_clicks"),
-     Input("btn-cancel-case", "n_clicks"),
-     Input("btn-cancel-replace", "n_clicks")],
-    prevent_initial_call=True
-)
-def close_text_modals(*args):
-    return None
-
-
-# 分箱模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-binning", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_binning_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("数值分箱"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="binning-column-select",
-                options=[{"label": col, "value": col} for col in numeric_cols],
-                placeholder="选择要分箱的列"
-            ),
-            html.Br(),
-            html.Label("分箱数量："),
-            dbc.Input(id="binning-bins-input", type="number", value=5, min=2, max=20),
-            html.Br(),
-            html.Label("新列名："),
-            dbc.Input(id="binning-new-name-input", placeholder="输入新列名（可选）"),
-            html.Br(),
-            html.Label("标签（可选，用逗号分隔）："),
-            dbc.Input(id="binning-labels-input", placeholder="例如: 低,中,高"),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-binning", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-binning", color="primary", size="sm"),
-        ]),
-    ], id="binning-modal", is_open=True)
-
-
-# 确认分箱
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-binning", "n_clicks"),
-    [State("binning-column-select", "value"),
-     State("binning-bins-input", "value"),
-     State("binning-new-name-input", "value"),
-     State("binning-labels-input", "value"),
-     State("operation-history", "data")],
-    prevent_initial_call=True
-)
-def confirm_binning(n_clicks, column, bins, new_name, labels_str, current_history):
-    if not n_clicks or not column or not bins:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        df_new = df.copy()
-
-        # 处理标签
-        labels = None
-        if labels_str and labels_str.strip():
-            labels = [label.strip() for label in labels_str.split(',')]
-            if len(labels) != bins:
-                return html.P(f"标签数量({len(labels)})必须等于分箱数量({bins})", className="text-danger"), None, current_history
-
-        # 分箱
-        new_col_name = new_name if new_name else f"{column}_binned"
-        df_new[new_col_name] = pd.cut(df_new[column], bins=bins, labels=labels)
-
-        data_manager.active_df = df_new
-
-        new_history = add_operation_to_history(
-            current_history,
-            f"分箱：{column} → {new_col_name}",
-            f"分为 {bins} 个箱"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 分箱完成"),
-                html.Br(),
-                f"原列：{column}",
-                html.Br(),
-                f"新列：{new_col_name}",
-                html.Br(),
-                f"分箱数：{bins}"
-            ], color="success"),
-            html.H5("分箱后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new[[column, new_col_name]].head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
-        ])
-
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"分箱失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 标准化模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-standardize", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_standardize_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("标准化（Z-score）"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="standardize-columns-select",
-                options=[{"label": col, "value": col} for col in numeric_cols],
-                placeholder="选择要标准化的列",
-                multi=True
-            ),
-            html.Br(),
-            dbc.Alert([
-                html.Strong("说明："),
-                html.Br(),
-                "标准化将数据转换为均值为0，标准差为1的分布",
-                html.Br(),
-                "公式：(x - mean) / std"
-            ], color="info", className="small"),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-standardize", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-standardize", color="primary", size="sm"),
-        ]),
-    ], id="standardize-modal", is_open=True)
-
-
-# 确认标准化
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-standardize", "n_clicks"),
-    [State("standardize-columns-select", "value"),
-     State("operation-history", "data")],
-    prevent_initial_call=True
-)
-def confirm_standardize(n_clicks, columns, current_history):
-    if not n_clicks or not columns:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        df_new = df.copy()
-
-        for col in columns:
-            mean = df_new[col].mean()
-            std = df_new[col].std()
-            df_new[col] = (df_new[col] - mean) / std
-
-        data_manager.active_df = df_new
-
-        new_history = add_operation_to_history(
-            current_history,
-            f"标准化：{', '.join(columns)}",
-            "Z-score标准化"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 标准化完成"),
-                html.Br(),
-                f"处理列：{', '.join(columns)}",
-                html.Br(),
-                "方法：Z-score标准化"
-            ], color="success"),
-            html.H5("标准化后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new[columns].head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
-        ])
-
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"标准化失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 归一化模态框
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    Input("btn-normalize", "n_clicks"),
-    prevent_initial_call=True
-)
-def show_normalize_modal(n_clicks):
-    if not n_clicks:
-        return None
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return dbc.Modal([
-            dbc.ModalHeader("错误"),
-            dbc.ModalBody("请先加载数据集"),
-        ], is_open=True)
-
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-
-    return dbc.Modal([
-        dbc.ModalHeader("归一化（Min-Max）"),
-        dbc.ModalBody([
-            html.Label("选择列："),
-            dcc.Dropdown(
-                id="normalize-columns-select",
-                options=[{"label": col, "value": col} for col in numeric_cols],
-                placeholder="选择要归一化的列",
-                multi=True
-            ),
-            html.Br(),
-            dbc.Alert([
-                html.Strong("说明："),
-                html.Br(),
-                "归一化将数据缩放到[0, 1]区间",
-                html.Br(),
-                "公式：(x - min) / (max - min)"
-            ], color="info", className="small"),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-cancel-normalize", color="secondary", size="sm"),
-            dbc.Button("确认", id="btn-confirm-normalize", color="primary", size="sm"),
-        ]),
-    ], id="normalize-modal", is_open=True)
-
-
-# 确认归一化
-@callback(
-    [Output("workshop-preview-area", "children", allow_duplicate=True),
-     Output("workshop-modals", "children", allow_duplicate=True),
-     Output("operation-history", "data", allow_duplicate=True)],
-    Input("btn-confirm-normalize", "n_clicks"),
-    [State("normalize-columns-select", "value"),
-     State("operation-history", "data")],
-    prevent_initial_call=True
-)
-def confirm_normalize(n_clicks, columns, current_history):
-    if not n_clicks or not columns:
-        return None, None, current_history
-
-    data_manager = DataManager()
-    df = data_manager.active_df
-
-    if df is None:
-        return html.P("数据集不存在", className="text-danger"), None, current_history
-
-    try:
-        df_new = df.copy()
-
-        for col in columns:
-            min_val = df_new[col].min()
-            max_val = df_new[col].max()
-            df_new[col] = (df_new[col] - min_val) / (max_val - min_val)
-
-        data_manager.active_df = df_new
-
-        new_history = add_operation_to_history(
-            current_history,
-            f"归一化：{', '.join(columns)}",
-            "Min-Max归一化"
-        )
-
-        result = html.Div([
-            dbc.Alert([
-                html.Strong("✓ 归一化完成"),
-                html.Br(),
-                f"处理列：{', '.join(columns)}",
-                html.Br(),
-                "方法：Min-Max归一化"
-            ], color="success"),
-            html.H5("归一化后数据预览：", className="mt-3"),
-            dbc.Table.from_dataframe(
-                df_new[columns].head(20),
-                striped=True,
-                bordered=True,
-                hover=True,
-                size="sm"
-            )
-        ])
-
-        return result, None, new_history
-
-    except Exception as e:
-        return html.P(f"归一化失败：{str(e)}", className="text-danger"), None, current_history
-
-
-# 更新关闭模态框回调
-@callback(
-    Output("workshop-modals", "children", allow_duplicate=True),
-    [Input("btn-cancel-binning", "n_clicks"),
-     Input("btn-cancel-standardize", "n_clicks"),
-     Input("btn-cancel-normalize", "n_clicks")],
-    prevent_initial_call=True
-)
-def close_numeric_modals(*args):
-    return None
-
+    return no_update, no_update

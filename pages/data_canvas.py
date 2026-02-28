@@ -123,24 +123,14 @@ def update_canvas(store_data, n_head, n_middle, n_tail, n_all, n_value, current_
     """当活跃数据集变化或预览模式改变时更新表格和概览卡片。"""
     from dash import ctx
     
-    print(f"[DEBUG] update_canvas called with store_data: {store_data}")
-    print(f"[DEBUG] triggered_id: {ctx.triggered_id}")
-    print(f"[DEBUG] n_value: {n_value}")
-    
     warning_msg = None
     
     try:
         dm = DataManager()
-        print(f"[DEBUG] DataManager instance created")
-        
         meta = dm.get_meta()
-        print(f"[DEBUG] meta: {meta}")
-        
         df = dm.active_df
-        print(f"[DEBUG] df is None: {df is None}")
 
         if df is None or meta is None:
-            print(f"[DEBUG] Returning empty state")
             # Empty state
             empty = html.Div(
                 className="dvs-empty",
@@ -152,9 +142,6 @@ def update_canvas(store_data, n_head, n_middle, n_tail, n_all, n_value, current_
             )
             return [], empty, None
     except Exception as e:
-        print(f"[ERROR] Exception in update_canvas: {e}")
-        import traceback
-        traceback.print_exc()
         # Error state
         error = html.Div(
             className="dvs-empty",
@@ -192,8 +179,6 @@ def update_canvas(store_data, n_head, n_middle, n_tail, n_all, n_value, current_
         view_mode = "all"
     elif ctx.triggered_id == "btn-view-head":
         view_mode = "head"
-    
-    print(f"[DEBUG] view_mode: {view_mode}")
     
     # ── Validate N value (only for non-"all" modes) ──
     n = 10  # default

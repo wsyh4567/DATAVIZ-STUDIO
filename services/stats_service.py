@@ -55,7 +55,7 @@ class StatsService:
                 result['distribution'] = '左偏分布'
 
         # 分类列统计
-        elif pd.api.types.is_object_dtype(series) or pd.api.types.is_categorical_dtype(series):
+        elif pd.api.types.is_object_dtype(series) or isinstance(series.dtype, pd.CategoricalDtype):
             value_counts = series.value_counts()
             result.update({
                 'unique': int(series.nunique()),

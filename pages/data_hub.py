@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 """DataViz Studio — 数据中心页
 
-数据源卡片 + 上传区域 + 已加载数据集列表。
+数据源卡片 + 上传区域 + URL导入 + 粘贴板导入 + 已加载数据集列表。
 """
 
 from __future__ import annotations
 
 import base64
+import io
 
-from dash import html, dcc, Input, Output, State, callback, no_update
+from dash import html, dcc, Input, Output, State, callback, no_update, ctx
+import dash_bootstrap_components as dbc
+import pandas as pd
 
 from core.data_manager import DataManager
 from services.data_loader import load_file
@@ -22,8 +25,8 @@ DATA_SOURCES = [
     {"icon": "📊", "label": "Excel", "enabled": True},
     {"icon": "🔗", "label": "JSON", "enabled": True},
     {"icon": "🗄️", "label": "数据库", "enabled": False},
-    {"icon": "🌐", "label": "URL", "enabled": False},
-    {"icon": "📋", "label": "粘贴板", "enabled": False},
+    {"icon": "🌐", "label": "URL", "enabled": True},
+    {"icon": "📋", "label": "粘贴板", "enabled": True},
 ]
 
 
@@ -65,7 +68,84 @@ def create_data_hub_page() -> html.Div:
                     ],
                 ),
                 multiple=False,
-                style={"marginBottom": "var(--sp-8)"},
+                style={"marginBottom": "var(--sp-4)"},
+            ),
+
+            # URL 导入区域
+            html.Div(
+                style={"marginBottom": "var(--sp-4)"},
+                children=[
+                    html.Div(
+                        className="dvs-section-header",
+                        children=[
+                            html.Span("🌐 从 URL 导入", className="dvs-section-header__title"),
+                        ],
+                    ),
+                    html.Div(
+                        style={"display": "flex", "gap": "8px", "alignItems": "center", "padding": "8px 0"},
+                        children=[
+                            dcc.Input(
+                                id="datahub-url-input",
+                                type="url",
+                                placeholder="输入 CSV/JSON 文件的 URL，如 https://example.com/data.csv",
+                                style={"flex": "1", "padding": "8px 12px", "borderRadius": "6px",
+                                       "border": "1px solid var(--border)", "backgroundColor": "var(--bg-secondary)",
+                                       "color": "var(--text-primary)", "fontSize": "0.875rem"},
+                            ),
+                            html.Button(
+                                "导入",
+                                id="datahub-url-btn",
+                                className="dvs-btn dvs-btn--primary",
+                                style={"padding": "8px 20px", "whiteSpace": "nowrap"},
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+
+            # 粘贴板导入区域
+            html.Div(
+                style={"marginBottom": "var(--sp-4)"},
+                children=[
+                    html.Div(
+                        className="dvs-section-header",
+                        children=[
+                            html.Span("📋 从粘贴板导入", className="dvs-section-header__title"),
+                        ],
+                    ),
+                    dcc.Textarea(
+                        id="datahub-paste-input",
+                        placeholder="粘贴表格数据（支持 Tab 分隔或逗号分隔）\n例如：\nname,age,city\nAlice,25,NYC\nBob,30,LA",
+                        style={"width": "100%", "height": "120px", "padding": "10px",
+                               "borderRadius": "6px", "border": "1px solid var(--border)",
+                               "backgroundColor": "var(--bg-secondary)", "color": "var(--text-primary)",
+                               "fontSize": "0.85rem", "fontFamily": "monospace", "resize": "vertical"},
+                    ),
+                    html.Div(
+                        style={"display": "flex", "gap": "8px", "marginTop": "8px", "alignItems": "center"},
+                        children=[
+                            dcc.Dropdown(
+                                id="datahub-paste-sep",
+                                options=[
+                                    {"label": "自动检测", "value": "auto"},
+                                    {"label": "逗号 (,)", "value": ","},
+                                    {"label": "Tab (\\t)", "value": "\t"},
+                                    {"label": "分号 (;)", "value": ";"},
+                                    {"label": "管道 (|)", "value": "|"},
+                                ],
+                                value="auto",
+                                clearable=False,
+                                style={"width": "160px"},
+                            ),
+                            html.Button(
+                                "导入粘贴数据",
+                                id="datahub-paste-btn",
+                                className="dvs-btn dvs-btn--primary",
+                                style={"padding": "8px 20px"},
+                            ),
+                        ],
+                    ),
+                ],
             ),
 
             # Dataset list
@@ -93,42 +173,143 @@ def create_data_hub_page() -> html.Div:
 )
 def on_datahub_upload(contents, filename, store_data):
     """数据中心文件上传。"""
-    print(f"[DEBUG] on_datahub_upload called: filename={filename}")
-    
     if contents is None or filename is None:
-        print(f"[DEBUG] contents or filename is None, returning no_update")
         return no_update, no_update
 
     try:
-        print(f"[DEBUG] Decoding file content...")
         content_type, content_string = contents.split(",")
         decoded = base64.b64decode(content_string)
 
-        print(f"[DEBUG] Loading file...")
         dm = DataManager()
         df = load_file(decoded, filename)
-        print(f"[DEBUG] File loaded: {len(df)} rows × {len(df.columns)} columns")
-        
+
         name = dm.add_dataset(filename, df, source=f"file:{filename}")
-        print(f"[DEBUG] Dataset added: {name}")
 
         store_data = store_data or {}
         store_data["active_dataset"] = name
         store_data["datasets"] = dm.dataset_names
         store_data["toast"] = {
-            "message": f"✅ 已加载 {name}（{len(df)} 行 × {len(df.columns)} 列）",
+            "message": f"已加载 {name}（{len(df)} 行 × {len(df.columns)} 列）",
             "type": "success",
         }
-        print(f"[DEBUG] Redirecting to /canvas")
         return store_data, "/canvas"
     except Exception as e:
-        print(f"[ERROR] Upload failed: {e}")
-        import traceback
-        traceback.print_exc()
         store_data = store_data or {}
-        store_data["toast"] = {"message": f"❌ 加载失败：{str(e)}", "type": "error"}
+        store_data["toast"] = {"message": f"加载失败：{str(e)}", "type": "error"}
         return store_data, no_update
 
+
+# ── URL 导入 ──────────────────────────────────────────
+
+@callback(
+    Output("app-store", "data", allow_duplicate=True),
+    Output("url", "pathname", allow_duplicate=True),
+    Input("datahub-url-btn", "n_clicks"),
+    State("datahub-url-input", "value"),
+    State("app-store", "data"),
+    prevent_initial_call=True,
+)
+def on_url_import(n_clicks, url_value, store_data):
+    """从 URL 导入 CSV/JSON 数据。"""
+    if not url_value or not url_value.strip():
+        return no_update, no_update
+
+    url = url_value.strip()
+    store_data = store_data or {}
+
+    try:
+        # 根据 URL 后缀猜测格式
+        url_lower = url.lower().split('?')[0]
+
+        if url_lower.endswith('.json'):
+            df = pd.read_json(url)
+        elif url_lower.endswith('.tsv'):
+            df = pd.read_csv(url, sep='\t')
+        elif url_lower.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(url)
+        elif url_lower.endswith('.parquet'):
+            df = pd.read_parquet(url)
+        else:
+            # 默认尝试 CSV
+            df = pd.read_csv(url)
+
+        # 提取文件名
+        filename = url.split('/')[-1].split('?')[0] or "url_data"
+
+        dm = DataManager()
+        name = dm.add_dataset(filename, df, source=f"url:{url}")
+
+        store_data["active_dataset"] = name
+        store_data["datasets"] = dm.dataset_names
+        store_data["toast"] = {
+            "message": f"已从 URL 加载 {name}（{len(df)} 行 × {len(df.columns)} 列）",
+            "type": "success",
+        }
+        return store_data, "/canvas"
+
+    except Exception as e:
+        store_data["toast"] = {"message": f"URL 导入失败：{str(e)}", "type": "error"}
+        return store_data, no_update
+
+
+# ── 粘贴板导入 ────────────────────────────────────────
+
+@callback(
+    Output("app-store", "data", allow_duplicate=True),
+    Output("url", "pathname", allow_duplicate=True),
+    Input("datahub-paste-btn", "n_clicks"),
+    State("datahub-paste-input", "value"),
+    State("datahub-paste-sep", "value"),
+    State("app-store", "data"),
+    prevent_initial_call=True,
+)
+def on_paste_import(n_clicks, paste_text, sep, store_data):
+    """从粘贴板文本导入数据。"""
+    if not paste_text or not paste_text.strip():
+        return no_update, no_update
+
+    store_data = store_data or {}
+
+    try:
+        text = paste_text.strip()
+
+        # 自动检测分隔符
+        if sep == "auto":
+            first_line = text.split('\n')[0]
+            if '\t' in first_line:
+                sep = '\t'
+            elif ',' in first_line:
+                sep = ','
+            elif ';' in first_line:
+                sep = ';'
+            elif '|' in first_line:
+                sep = '|'
+            else:
+                sep = ','
+
+        df = pd.read_csv(io.StringIO(text), sep=sep)
+
+        if df.empty:
+            store_data["toast"] = {"message": "粘贴的数据为空", "type": "error"}
+            return store_data, no_update
+
+        dm = DataManager()
+        name = dm.add_dataset("粘贴数据", df, source="clipboard")
+
+        store_data["active_dataset"] = name
+        store_data["datasets"] = dm.dataset_names
+        store_data["toast"] = {
+            "message": f"已从粘贴板加载 {name}（{len(df)} 行 × {len(df.columns)} 列）",
+            "type": "success",
+        }
+        return store_data, "/canvas"
+
+    except Exception as e:
+        store_data["toast"] = {"message": f"粘贴板导入失败：{str(e)}", "type": "error"}
+        return store_data, no_update
+
+
+# ── 数据集列表 ────────────────────────────────────────
 
 @callback(
     Output("datahub-dataset-list", "children"),

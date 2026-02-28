@@ -97,6 +97,16 @@ def load_json(
         raise ValueError("JSON 格式不受支持：需要数组或对象。")
 
 
+def load_parquet(file_content: bytes) -> pd.DataFrame:
+    """加载 Parquet 文件。"""
+    return pd.read_parquet(io.BytesIO(file_content))
+
+
+def load_feather(file_content: bytes) -> pd.DataFrame:
+    """加载 Feather 文件。"""
+    return pd.read_feather(io.BytesIO(file_content))
+
+
 def load_file(file_content: bytes, filename: str) -> pd.DataFrame:
     """根据文件扩展名自动选择加载方式。"""
     ext = Path(filename).suffix.lower()
@@ -106,6 +116,10 @@ def load_file(file_content: bytes, filename: str) -> pd.DataFrame:
         return load_excel(file_content)
     elif ext == ".json":
         return load_json(file_content)
+    elif ext == ".parquet":
+        return load_parquet(file_content)
+    elif ext in (".feather", ".ftr"):
+        return load_feather(file_content)
     else:
         raise ValueError(f"不支持的文件格式：{ext}")
 

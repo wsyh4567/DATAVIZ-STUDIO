@@ -24,7 +24,7 @@ APP_DESCRIPTION: Final[str] = "免费开源的零代码数据分析可视化平�
 MAX_UPLOAD_SIZE_MB: Final[int] = 500
 SUPPORTED_FILE_TYPES: Final[list[str]] = [
     ".csv", ".tsv", ".xlsx", ".xls", ".json",
-    ".parquet", ".feather",
+    ".parquet", ".feather", ".ftr",
 ]
 
 # ── 主题 ─────────────────────────────────────────────

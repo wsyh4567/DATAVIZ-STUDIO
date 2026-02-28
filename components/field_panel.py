@@ -12,7 +12,7 @@ import dash_bootstrap_components as dbc
 from dash import html, dcc
 import pandas as pd
 
-from services.chart_service import classify_dataframe, FieldType
+from services.field_analyzer import FieldType, analyze_fields, FieldInfo
 
 
 def create_field_panel(df: Optional[pd.DataFrame] = None) -> dbc.Col:
@@ -42,9 +42,9 @@ def create_field_panel(df: Optional[pd.DataFrame] = None) -> dbc.Col:
         )
 
     # 分类字段
-    field_info = classify_dataframe(df)
-    measures = [info for info in field_info.values() if info.type == FieldType.MEASURE]
-    dimensions = [info for info in field_info.values() if info.type == FieldType.DIMENSION]
+    field_list = analyze_fields(df)
+    measures = [info for info in field_list if info.field_type == FieldType.MEASURE]
+    dimensions = [info for info in field_list if info.field_type in (FieldType.DIMENSION, FieldType.NOMINAL, FieldType.TEMPORAL)]
 
     return dbc.Col(
         [
@@ -52,7 +52,7 @@ def create_field_panel(df: Optional[pd.DataFrame] = None) -> dbc.Col:
             html.Div(
                 [
                     html.H6("字段列表", className="mb-0"),
-                    html.Small(f"{len(field_info)} 个字段", className="text-muted"),
+                    html.Small(f"{len(field_list)} 个字段", className="text-muted"),
                 ],
                 className="p-3 border-bottom"
             ),

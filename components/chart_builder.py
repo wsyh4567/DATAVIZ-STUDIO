@@ -12,7 +12,17 @@ import dash_bootstrap_components as dbc
 from dash import html, dcc
 import plotly.graph_objects as go
 
-from services.chart_service import CHART_TYPES, ChartCategory
+from services.chart_service import PLOTLY_CHART_TYPES, SEABORN_CHART_TYPES, ChartType
+
+
+# 图表分类
+_CHART_CATEGORIES = {
+    "comparison": {"name": "比较", "icon": "bi-bar-chart"},
+    "trend": {"name": "趋势", "icon": "bi-graph-up"},
+    "distribution": {"name": "分布", "icon": "bi-bar-chart-steps"},
+    "relationship": {"name": "关系", "icon": "bi-diagram-3"},
+    "composition": {"name": "占比", "icon": "bi-pie-chart"},
+}
 
 
 def create_chart_type_selector() -> html.Div:
@@ -21,24 +31,23 @@ def create_chart_type_selector() -> html.Div:
     Returns:
         图表类型选择器组件
     """
-    # 按类别分组
-    categories = {
-        ChartCategory.COMPARISON: {"name": "比较", "icon": "bi-bar-chart"},
-        ChartCategory.TREND: {"name": "趋势", "icon": "bi-graph-up"},
-        ChartCategory.DISTRIBUTION: {"name": "分布", "icon": "bi-bar-chart-steps"},
-        ChartCategory.RELATIONSHIP: {"name": "关系", "icon": "bi-diagram-3"},
-        ChartCategory.COMPOSITION: {"name": "占比", "icon": "bi-pie-chart"},
-    }
+    # 合并所有图表类型并按类别分组
+    all_charts = {}
+    all_charts.update(PLOTLY_CHART_TYPES)
+    for k, v in SEABORN_CHART_TYPES.items():
+        if k not in all_charts:
+            all_charts[k] = v
 
     chart_groups = {}
-    for chart_type in CHART_TYPES:
-        if chart_type.category not in chart_groups:
-            chart_groups[chart_type.category] = []
-        chart_groups[chart_type.category].append(chart_type)
+    for chart_id, info in all_charts.items():
+        category = info.get("category", "comparison")
+        if category not in chart_groups:
+            chart_groups[category] = []
+        chart_groups[category].append({"id": chart_id, **info})
 
     # 创建分类标签页
     tabs = []
-    for category, info in categories.items():
+    for category, cat_info in _CHART_CATEGORIES.items():
         if category in chart_groups:
             charts = chart_groups[category]
             tab_content = html.Div(
@@ -51,8 +60,8 @@ def create_chart_type_selector() -> html.Div:
             tabs.append(
                 dbc.Tab(
                     tab_content,
-                    label=info["name"],
-                    tab_id=category.value,
+                    label=cat_info["name"],
+                    tab_id=category,
                     className="chart-category-tab"
                 )
             )
@@ -63,36 +72,41 @@ def create_chart_type_selector() -> html.Div:
             dbc.Tabs(
                 tabs,
                 id="chart-category-tabs",
-                active_tab=ChartCategory.COMPARISON.value,
+                active_tab="comparison",
                 className="chart-category-tabs"
             ),
         ]
     )
 
 
-def _create_chart_type_card(chart_type) -> html.Div:
+def _create_chart_type_card(chart_info: dict) -> html.Div:
     """创建图表类型卡片
 
     Args:
-        chart_type: 图表类型
+        chart_info: 图表类型信息字典
 
     Returns:
         图表类型卡片
     """
+    chart_id = chart_info.get("id", "")
+    icon = chart_info.get("icon", "graph-up")
+    name = chart_info.get("name", chart_id)
+    description = chart_info.get("description", "")
+
     return html.Div(
         [
             html.Div(
                 [
-                    html.I(className=f"bi bi-{chart_type.icon}", style={"fontSize": "24px"}),
-                    html.Div(chart_type.name, className="chart-type-name mt-2"),
+                    html.I(className=f"bi bi-{icon}", style={"fontSize": "24px"}),
+                    html.Div(name, className="chart-type-name mt-2"),
                 ],
                 className="chart-type-card-inner"
             )
         ],
-        id={"type": "chart-type-card", "chart_id": chart_type.id},
+        id={"type": "chart-type-card", "chart_id": chart_id},
         className="chart-type-card",
-        title=chart_type.description,
-        **{"data-chart-id": chart_type.id}
+        title=description,
+        **{"data-chart-id": chart_id}
     )
 
 
