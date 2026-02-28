@@ -71,8 +71,11 @@ def create_chart_studio_page() -> html.Div:
 
                     html.Hr(),
 
-                    # 参数配置区域
-                    html.Div(id='params-panel-container'),
+                    # 参数配置区域（初始加载Plotly参数面板）
+                    html.Div(
+                        id='params-panel-container',
+                        children=create_plotly_params_panel(df) if df is not None else html.Div()
+                    ),
 
                 ], className='p-3')
             ], width=3, className='bg-secondary border-end', style={'height': 'calc(100vh - 140px)', 'overflowY': 'auto'}),
