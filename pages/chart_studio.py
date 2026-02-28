@@ -637,6 +637,13 @@ def generate_chart(
         chart_service = ChartService()
         chart_service.set_library(ChartLibrary(library))
 
+        # 验证chart_type不为None
+        if not chart_type:
+            return {
+                "success": False,
+                "error": "图表类型不能为空"
+            }
+
         result = chart_service.create_chart(
             df=df,
             chart_type=ChartType(chart_type),

@@ -158,7 +158,7 @@ class TypeDetector:
             success = 0
             for val in sample:
                 try:
-                    pd.Timestamp.strptime(val.strip(), fmt)
+                    pd.to_datetime(val.strip(), format=fmt)
                     success += 1
                 except (ValueError, TypeError):
                     pass
