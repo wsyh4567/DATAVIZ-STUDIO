@@ -12,6 +12,7 @@ from dash import html, dcc, callback, Input, Output, State, no_update
 import pandas as pd
 import json
 import io
+import plotly.graph_objects as go
 
 from core.data_manager import DataManager
 from components.code_preview import create_code_preview_panel
@@ -117,6 +118,18 @@ def create_chart_studio_page() -> html.Div:
         dcc.Store(id='chart-data-store'),
         dcc.Store(id='chart-figure-store'),
         dcc.Download(id='download-chart-file'),
+
+        # Toast 提示
+        dbc.Toast(
+            "代码已复制到剪贴板",
+            id="copy-success-toast",
+            header="成功",
+            is_open=False,
+            dismissable=True,
+            icon="success",
+            duration=2000,
+            style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999},
+        ),
 
     ], id='chart-studio-page')
 

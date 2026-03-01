@@ -148,7 +148,7 @@ def layout():
                         html.Div(id="step-header", children=create_step_header(0))
                     ]),
                     dbc.CardBody([
-                        html.Div(id="step-list", children=create_step_panel([])),
+                        html.Div(id="step-list", children=create_step_panel([], step_manager)),
                         create_step_actions(),
                     ], style={"padding": "1rem", "maxHeight": "600px", "overflowY": "auto"})
                 ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
@@ -171,6 +171,7 @@ def layout():
 
         # 下载组件
         dcc.Download(id='download-code'),
+        dcc.Download(id='download-code-file'),
 
         # 状态提示
         html.Div(id='copy-code-status', style={'display': 'none'}),
