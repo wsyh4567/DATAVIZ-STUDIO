@@ -97,7 +97,7 @@ def create_data_hub_page() -> html.Div:
                             html.Button(
                                 "导入",
                                 id="datahub-url-btn",
-                                className="dvs-btn dvs-btn--primary",
+                                className="dvs-btn dvs-btn--primary btn-hover",
                                 style={"padding": "8px 20px", "whiteSpace": "nowrap"},
                             ),
                         ],
@@ -142,7 +142,7 @@ def create_data_hub_page() -> html.Div:
                             html.Button(
                                 "导入粘贴数据",
                                 id="datahub-paste-btn",
-                                className="dvs-btn dvs-btn--primary",
+                                className="dvs-btn dvs-btn--primary btn-hover",
                                 style={"padding": "8px 20px"},
                             ),
                         ],

@@ -24,21 +24,24 @@ def create_code_preview_panel():
                     id="copy-code-btn",
                     size="sm",
                     color="primary",
-                    outline=True
+                    outline=True,
+                    className="btn-hover"
                 ),
                 dbc.Button(
                     [html.I(className="bi bi-download me-1"), "下载 .py"],
                     id="download-py-btn",
                     size="sm",
                     color="secondary",
-                    outline=True
+                    outline=True,
+                    className="btn-hover"
                 ),
                 dbc.Button(
                     [html.I(className="bi bi-journal-code me-1"), "导出 Jupyter"],
                     id="export-jupyter-btn",
                     size="sm",
                     color="info",
-                    outline=True
+                    outline=True,
+                    className="btn-hover"
                 ),
             ], size="sm"),
         ], className="code-preview-header"),

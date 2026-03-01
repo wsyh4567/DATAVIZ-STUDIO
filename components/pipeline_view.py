@@ -30,15 +30,15 @@ def create_pipeline_view(pipeline_id="operation-pipeline", operations=None):
                 dbc.Button([
                     html.I(className="bi bi-arrow-counterclockwise me-1"),
                     "撤销"
-                ], id=f"{pipeline_id}-undo-btn", size="sm", outline=True, disabled=len(operations) == 0),
+                ], id=f"{pipeline_id}-undo-btn", size="sm", outline=True, disabled=len(operations) == 0, className="btn-hover"),
                 dbc.Button([
                     html.I(className="bi bi-arrow-clockwise me-1"),
                     "重做"
-                ], id=f"{pipeline_id}-redo-btn", size="sm", outline=True, disabled=True),
+                ], id=f"{pipeline_id}-redo-btn", size="sm", outline=True, disabled=True, className="btn-hover"),
                 dbc.Button([
                     html.I(className="bi bi-trash me-1"),
                     "清空"
-                ], id=f"{pipeline_id}-clear-btn", size="sm", outline=True, color="danger", disabled=len(operations) == 0),
+                ], id=f"{pipeline_id}-clear-btn", size="sm", outline=True, color="danger", disabled=len(operations) == 0, className="btn-hover"),
             ], className="mb-3 w-100"),
         ]),
 
@@ -70,7 +70,7 @@ def create_pipeline_view(pipeline_id="operation-pipeline", operations=None):
             dbc.Button([
                 html.I(className="bi bi-code-square me-2"),
                 "导出为代码"
-            ], id=f"{pipeline_id}-export-btn", color="success", size="sm", outline=True, className="w-100 mt-3", disabled=len(operations) == 0),
+            ], id=f"{pipeline_id}-export-btn", color="success", size="sm", outline=True, className="w-100 mt-3 btn-hover", disabled=len(operations) == 0),
         ]),
 
         # 存储操作数据
@@ -180,7 +180,8 @@ def create_operation_card(index, operation):
                             size="sm",
                             outline=True,
                             color="secondary",
-                            title="启用/禁用"
+                            title="启用/禁用",
+                            className="btn-hover"
                         ),
                         dbc.Button(
                             html.I(className="bi bi-x"),
@@ -188,7 +189,8 @@ def create_operation_card(index, operation):
                             size="sm",
                             outline=True,
                             color="danger",
-                            title="删除"
+                            title="删除",
+                            className="btn-hover"
                         ),
                     ], size="sm")
                 ], width=3, className="text-end"),
@@ -267,7 +269,7 @@ def create_operation_template_selector():
                 dbc.Button([
                     html.I(className="bi bi-save me-1"),
                     "保存"
-                ], id="pipeline-template-save-btn", size="sm", outline=True, color="primary")
+                ], id="pipeline-template-save-btn", size="sm", outline=True, color="primary", className="btn-hover")
             ], width=4),
         ]),
     ], className="pipeline-template-selector mb-3")

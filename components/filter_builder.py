@@ -33,12 +33,12 @@ def create_filter_builder(filter_id="filter-builder", columns=None):
             dbc.Button([
                 html.I(className="bi bi-plus-circle me-2"),
                 "添加条件"
-            ], id=f"{filter_id}-add-btn", color="primary", size="sm", outline=True),
+            ], id=f"{filter_id}-add-btn", color="primary", size="sm", outline=True, className="btn-hover"),
 
             dbc.Button([
                 html.I(className="bi bi-braces me-2"),
                 "添加条件组"
-            ], id=f"{filter_id}-add-group-btn", color="info", size="sm", outline=True, className="ms-2"),
+            ], id=f"{filter_id}-add-group-btn", color="info", size="sm", outline=True, className="ms-2 btn-hover"),
         ], className="mt-3"),
 
         # 存储筛选条件数据
@@ -125,7 +125,8 @@ def create_filter_condition(condition_id, columns, condition_data=None):
                         id={"type": "filter-delete", "index": condition_id},
                         color="danger",
                         size="sm",
-                        outline=True
+                        outline=True,
+                        className="btn-hover"
                     )
                 ], width=1),
             ], className="align-items-center"),
@@ -169,7 +170,8 @@ def create_filter_group(group_id, columns, group_data=None):
                         id={"type": "filter-group-delete", "index": group_id},
                         color="danger",
                         size="sm",
-                        outline=True
+                        outline=True,
+                        className="btn-hover"
                     )
                 ], width=2, className="text-end"),
             ])
@@ -183,7 +185,7 @@ def create_filter_group(group_id, columns, group_data=None):
                 html.I(className="bi bi-plus me-2"),
                 "添加条件"
             ], id={"type": "filter-group-add", "index": group_id},
-            color="primary", size="sm", outline=True, className="mt-2")
+            color="primary", size="sm", outline=True, className="mt-2 btn-hover")
         ])
     ], className="mb-3 filter-group-card", color="light", outline=True)
 

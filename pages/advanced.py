@@ -50,9 +50,9 @@ def create_advanced_page() -> html.Div:
                 html.H2([
                     html.I(className="bi bi-tools me-3", style={"color": "var(--accent)"}),
                     "高级工具"
-                ], className="mb-1", style={"fontWeight": "600"}),
+                ], className="mb-1 fade-in", style={"fontWeight": "600"}),
                 html.P("数据变形、合并、抽样等高级操作",
-                       style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
+                       className="fade-in", style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
             ]),
         ], className="mb-4"),
 
@@ -87,10 +87,10 @@ def create_advanced_page() -> html.Div:
                                 ], value='mean', clearable=False),
                             ], width=3),
                         ], className="mb-3"),
-                        dbc.Button("执行透视", id="btn-run-pivot", color="primary"),
+                        dbc.Button("执行透视", id="btn-run-pivot", color="primary", className="btn-hover"),
                         html.Div(id="pivot-result", className="mt-3"),
                     ])
-                ], className="mt-3", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+                ], className="mt-3 card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
             ]),
 
             # ─── 逆透视 (Melt) ────────────────────────
@@ -117,10 +117,10 @@ def create_advanced_page() -> html.Div:
                                          placeholder='值列名', size='sm'),
                             ], width=4),
                         ], className="mb-3"),
-                        dbc.Button("执行逆透视", id="btn-run-melt", color="primary"),
+                        dbc.Button("执行逆透视", id="btn-run-melt", color="primary", className="btn-hover"),
                         html.Div(id="melt-result", className="mt-3"),
                     ])
-                ], className="mt-3", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+                ], className="mt-3 card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
             ]),
 
             # ─── 合并数据集 ────────────────────────────
@@ -154,10 +154,10 @@ def create_advanced_page() -> html.Div:
                                 ], value='inner', clearable=False),
                             ], width=3),
                         ], className="mb-3"),
-                        dbc.Button("执行合并", id="btn-run-merge", color="primary"),
+                        dbc.Button("执行合并", id="btn-run-merge", color="primary", className="btn-hover"),
                         html.Div(id="merge-result", className="mt-3"),
                     ])
-                ], className="mt-3", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+                ], className="mt-3 card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
             ]),
 
             # ─── 随机抽样 ──────────────────────────────
@@ -187,10 +187,10 @@ def create_advanced_page() -> html.Div:
                                 dbc.Input(id='adv-sample-seed', type='number', value=42),
                             ], width=3),
                         ], className="mb-3"),
-                        dbc.Button("执行抽样", id="btn-run-sample", color="primary"),
+                        dbc.Button("执行抽样", id="btn-run-sample", color="primary", className="btn-hover"),
                         html.Div(id="sample-result", className="mt-3"),
                     ])
-                ], className="mt-3", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+                ], className="mt-3 card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
             ]),
 
             # ─── 纵向拼接 ──────────────────────────────

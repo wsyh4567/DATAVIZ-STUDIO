@@ -74,11 +74,11 @@ def create_operation_toolbar() -> html.Div:
                 dbc.Button([
                     html.I(className="bi bi-arrow-counterclockwise me-2"),
                     "撤销"
-                ], id="btn-undo", color="secondary", size="sm", disabled=True, className="w-100"),
+                ], id="btn-undo", color="secondary", size="sm", disabled=True, className="w-100 btn-hover"),
                 dbc.Button([
                     html.I(className="bi bi-arrow-clockwise me-2"),
                     "重做"
-                ], id="btn-redo", color="secondary", size="sm", disabled=True, className="w-100"),
+                ], id="btn-redo", color="secondary", size="sm", disabled=True, className="w-100 btn-hover"),
             ], vertical=True, className="w-100"),
         ], style={"padding": "1rem"})
     ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
@@ -99,7 +99,7 @@ def create_tool_button(label: str, icon: str, button_id: str, color: str) -> dbc
     return dbc.Button([
         html.I(className=f"bi {icon} me-2"),
         label
-    ], id=button_id, color=color, size="sm", outline=True, className="mb-2 w-100 text-start")
+    ], id=button_id, color=color, size="sm", outline=True, className="mb-2 w-100 text-start btn-hover")
 
 
 def create_compact_toolbar() -> html.Div:
@@ -111,28 +111,28 @@ def create_compact_toolbar() -> html.Div:
     return html.Div([
         dbc.ButtonGroup([
             dbc.Button(html.I(className="bi bi-funnel"), id="btn-filter-compact",
-                      color="primary", size="sm", title="筛选"),
+                      color="primary", size="sm", title="筛选", className="btn-hover"),
             dbc.Button(html.I(className="bi bi-trash"), id="btn-drop-column-compact",
-                      color="danger", size="sm", title="删除列"),
+                      color="danger", size="sm", title="删除列", className="btn-hover"),
             dbc.Button(html.I(className="bi bi-type"), id="btn-type-convert-compact",
-                      color="info", size="sm", title="类型转换"),
+                      color="info", size="sm", title="类型转换", className="btn-hover"),
             dbc.Button(html.I(className="bi bi-droplet"), id="btn-fill-missing-compact",
-                      color="warning", size="sm", title="填充缺失值"),
+                      color="warning", size="sm", title="填充缺失值", className="btn-hover"),
         ], className="me-2"),
 
         dbc.ButtonGroup([
             dbc.Button(html.I(className="bi bi-arrow-counterclockwise"),
                       id="btn-undo-compact", color="secondary", size="sm",
-                      disabled=True, title="撤销"),
+                      disabled=True, title="撤销", className="btn-hover"),
             dbc.Button(html.I(className="bi bi-arrow-clockwise"),
                       id="btn-redo-compact", color="secondary", size="sm",
-                      disabled=True, title="重做"),
+                      disabled=True, title="重做", className="btn-hover"),
         ], className="me-2"),
 
         dbc.ButtonGroup([
             dbc.Button([html.I(className="bi bi-code-slash me-1"), "代码"],
-                      id="btn-view-code", color="success", size="sm", outline=True),
+                      id="btn-view-code", color="success", size="sm", outline=True, className="btn-hover"),
             dbc.Button([html.I(className="bi bi-download me-1"), "导出"],
-                      id="btn-export", color="primary", size="sm", outline=True),
+                      id="btn-export", color="primary", size="sm", outline=True, className="btn-hover"),
         ]),
     ], className="d-flex align-items-center")

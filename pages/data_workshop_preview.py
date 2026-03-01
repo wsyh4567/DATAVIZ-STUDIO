@@ -45,11 +45,11 @@ layout = dbc.Container([
                 dbc.Button([
                     html.I(className="bi bi-code-slash me-2"),
                     "查看代码"
-                ], id="btn-view-code", color="success", size="sm", outline=True, className="me-2"),
+                ], id="btn-view-code", color="success", size="sm", outline=True, className="me-2 btn-hover"),
                 dbc.Button([
                     html.I(className="bi bi-download me-2"),
                     "导出"
-                ], id="btn-export", color="primary", size="sm", outline=True),
+                ], id="btn-export", color="primary", size="sm", outline=True, className="btn-hover"),
             ], className="d-flex justify-content-end")
         ], width=4),
     ], className="mb-4"),
@@ -88,7 +88,7 @@ layout = dbc.Container([
                         dbc.Button([
                             html.I(className="bi bi-file-earmark-spreadsheet me-2"),
                             "加载示例数据"
-                        ], id="btn-load-sample", color="primary", className="mt-3")
+                        ], id="btn-load-sample", color="primary", className="mt-3 btn-hover")
                     ], className="text-center")
                 ], style={"padding": "1rem"})
             ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})

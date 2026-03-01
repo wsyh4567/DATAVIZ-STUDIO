@@ -17,8 +17,8 @@ def layout():
     return html.Div([
         # 页面标题
         html.Div([
-            html.H3("🧮 统计实验室", className="page-title"),
-            html.P("统计分析与假设检验", className="page-subtitle")
+            html.H3("🧮 统计实验室", className="page-title fade-in"),
+            html.P("统计分析与假设检验", className="page-subtitle fade-in")
         ], className="page-header"),
 
         # 主内容区域
@@ -35,12 +35,12 @@ def layout():
                     dbc.NavLink("假设检验", href="#", id="nav-hypothesis"),
                 ], vertical=True, pills=True),
 
-            ], className="stats-menu"),
+            ], className="stats-menu slide-in-left"),
 
             # 主分析区域
             html.Div([
                 html.Div(id="stats-content-area"),
-            ], className="stats-main"),
+            ], className="stats-main slide-in-right"),
 
         ], className="stats-container"),
 
@@ -117,7 +117,7 @@ def render_descriptive_stats(df):
     columns = df.columns.tolist()
 
     return html.Div([
-        html.H4("描述性统计", className="mb-3"),
+        html.H4("描述性统计", className="mb-3 fade-in"),
 
         dbc.Row([
             dbc.Col([
@@ -129,7 +129,7 @@ def render_descriptive_stats(df):
                     placeholder="选择要分析的列"
                 ),
             ], width=6),
-        ], className="mb-3"),
+        ], className="mb-3 fade-in"),
 
         html.Div(id="descriptive-stats-output"),
     ])
@@ -165,7 +165,7 @@ def show_descriptive_stats(column):
             html.P([html.Strong("有效值: "), f"{stats['count']:,}"]),
             html.P([html.Strong("缺失值: "), f"{stats['missing']:,} ({stats['missing_pct']:.1f}%)"]),
         ])
-    ], className="mb-3"))
+    ], className="mb-3 card-hover stagger-item"))
 
     # 数值列统计
     if 'mean' in stats:
@@ -190,7 +190,7 @@ def show_descriptive_stats(column):
                 html.P([html.Strong("偏度: "), f"{stats['skewness']:.2f}"]),
                 html.P([html.Strong("峰度: "), f"{stats['kurtosis']:.2f}"]),
             ])
-        ], className="mb-3"))
+        ], className="mb-3 card-hover stagger-item"))
 
         # 绘制直方图
         fig = px.histogram(df, x=column, nbins=30, title=f"{column} 分布图")

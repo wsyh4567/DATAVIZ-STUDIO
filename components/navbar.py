@@ -28,22 +28,22 @@ def create_navbar() -> html.Div:
                 children=[
                     html.Button(
                         "🔔", id="btn-notifications",
-                        className="dvs-topbar__btn",
+                        className="dvs-topbar__btn btn-hover",
                         title="通知",
                     ),
                     html.Button(
                         "🌓", id="btn-theme-toggle",
-                        className="dvs-topbar__btn",
+                        className="dvs-topbar__btn btn-hover",
                         title="切换主题",
                     ),
                     html.Button(
                         "⚙️", id="btn-settings",
-                        className="dvs-topbar__btn",
+                        className="dvs-topbar__btn btn-hover",
                         title="设置",
                     ),
                     html.Button(
                         "❓", id="btn-help",
-                        className="dvs-topbar__btn",
+                        className="dvs-topbar__btn btn-hover",
                         title="帮助",
                     ),
                 ],

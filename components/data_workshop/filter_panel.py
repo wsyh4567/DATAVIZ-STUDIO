@@ -103,11 +103,11 @@ def create_numeric_filter(column: str) -> html.Div:
                 dbc.Button([
                     html.I(className="bi bi-check-circle me-2"),
                     "应用筛选"
-                ], id={'type': 'apply-filter', 'column': column}, color="primary", size="sm"),
+                ], id={'type': 'apply-filter', 'column': column}, color="primary", size="sm", className="btn-hover"),
                 dbc.Button([
                     html.I(className="bi bi-x-circle me-2"),
                     "取消"
-                ], id={'type': 'cancel-filter', 'column': column}, color="secondary", size="sm", outline=True),
+                ], id={'type': 'cancel-filter', 'column': column}, color="secondary", size="sm", outline=True, className="btn-hover"),
             ], className="w-100"),
         ], style={"padding": "1rem"})
     ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
@@ -175,11 +175,11 @@ def create_text_filter(column: str) -> html.Div:
                 dbc.Button([
                     html.I(className="bi bi-check-circle me-2"),
                     "应用筛选"
-                ], id={'type': 'apply-filter', 'column': column}, color="primary", size="sm"),
+                ], id={'type': 'apply-filter', 'column': column}, color="primary", size="sm", className="btn-hover"),
                 dbc.Button([
                     html.I(className="bi bi-x-circle me-2"),
                     "取消"
-                ], id={'type': 'cancel-filter', 'column': column}, color="secondary", size="sm", outline=True),
+                ], id={'type': 'cancel-filter', 'column': column}, color="secondary", size="sm", outline=True, className="btn-hover"),
             ], className="w-100"),
         ], style={"padding": "1rem"})
     ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
@@ -231,11 +231,11 @@ def create_date_filter(column: str) -> html.Div:
                 dbc.Button([
                     html.I(className="bi bi-check-circle me-2"),
                     "应用筛选"
-                ], id={'type': 'apply-filter', 'column': column}, color="primary", size="sm"),
+                ], id={'type': 'apply-filter', 'column': column}, color="primary", size="sm", className="btn-hover"),
                 dbc.Button([
                     html.I(className="bi bi-x-circle me-2"),
                     "取消"
-                ], id={'type': 'cancel-filter', 'column': column}, color="secondary", size="sm", outline=True),
+                ], id={'type': 'cancel-filter', 'column': column}, color="secondary", size="sm", outline=True, className="btn-hover"),
             ], className="w-100"),
         ], style={"padding": "1rem"})
     ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
@@ -256,10 +256,10 @@ def create_generic_filter(column: str) -> html.Div:
             f"筛选: {column}"
         ], style={"fontWeight": "bold"}),
         dbc.CardBody([
-            html.P("该列类型暂不支持可视化筛选", 
+            html.P("该列类型暂不支持可视化筛选",
                   style={"color": "var(--text-muted)", "fontSize": "0.875rem"}),
-            dbc.Button("关闭", id={'type': 'cancel-filter', 'column': column}, 
-                      color="secondary", size="sm", className="w-100"),
+            dbc.Button("关闭", id={'type': 'cancel-filter', 'column': column},
+                      color="secondary", size="sm", className="w-100 btn-hover"),
         ], style={"padding": "1rem"})
     ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
 

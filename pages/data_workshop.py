@@ -79,9 +79,9 @@ def layout():
                     html.H2([
                         html.I(className="bi bi-magic me-3", style={"color": "var(--accent)"}),
                         "数据工坊 - 实时预览"
-                    ], className="mb-2", style={"fontWeight": "600"}),
+                    ], className="mb-2 fade-in", style={"fontWeight": "600"}),
                     html.P("所见即所得的数据清洗和转换体验",
-                          style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
+                          className="fade-in", style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
                 ])
             ], width=6),
             dbc.Col([
@@ -89,16 +89,16 @@ def layout():
                     dbc.Button([
                         html.I(className="bi bi-check2-circle me-2"),
                         "应用到数据集"
-                    ], id="btn-apply-to-dataset", color="warning", size="sm", outline=True, className="me-2"),
+                    ], id="btn-apply-to-dataset", color="warning", size="sm", outline=True, className="me-2 btn-hover"),
                     dbc.Button([
                         html.I(className="bi bi-code-slash me-2"),
                         "查看代码"
-                    ], id="btn-view-code", color="success", size="sm", outline=True, className="me-2"),
+                    ], id="btn-view-code", color="success", size="sm", outline=True, className="me-2 btn-hover"),
                     dbc.Button([
                         html.I(className="bi bi-download me-2"),
                         "导出"
-                    ], id="btn-export", color="primary", size="sm", outline=True),
-                ], className="d-flex justify-content-end")
+                    ], id="btn-export", color="primary", size="sm", outline=True, className="btn-hover"),
+                ], className="d-flex justify-content-end fade-in")
             ], width=6),
         ], className="mb-4"),
 
@@ -107,7 +107,7 @@ def layout():
             # 左侧：操作工具栏
             dbc.Col([
                 create_operation_toolbar()
-            ], width=2),
+            ], width=2, className="slide-in-left"),
 
             # 中间：数据预览区
             dbc.Col([
@@ -135,11 +135,11 @@ def layout():
                             dbc.Button([
                                 html.I(className="bi bi-file-earmark-spreadsheet me-2"),
                                 "加载示例数据"
-                            ], id="btn-load-sample", color="primary", className="mt-3")
+                            ], id="btn-load-sample", color="primary", className="mt-3 btn-hover")
                         ], className="text-center", style={"display": "none"} if has_active else {})
                     ], style={"padding": "1rem"})
-                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=7),
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=7, className="scale-in"),
 
             # 右侧：步骤管理面板
             dbc.Col([
@@ -151,8 +151,8 @@ def layout():
                         html.Div(id="step-list", children=create_step_panel([])),
                         create_step_actions(),
                     ], style={"padding": "1rem", "maxHeight": "600px", "overflowY": "auto"})
-                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=3),
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=3, className="slide-in-right"),
         ]),
 
         # 数据存储

@@ -61,8 +61,9 @@ def create_dashboard_page() -> html.Div:
                 html.H2([
                     html.I(className="bi bi-speedometer2 me-3", style={"color": "var(--accent)"}),
                     "仪表盘"
-                ], className="mb-1", style={"fontWeight": "600"}),
+                ], className="mb-1 fade-in", style={"fontWeight": "600"}),
                 html.P(f"当前数据集: {dm.active_name or '未命名'}",
+                       className="fade-in",
                        style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
             ]),
         ], className="mb-4"),
@@ -78,7 +79,7 @@ def create_dashboard_page() -> html.Div:
             _metric_card("质量分数", f"{ov['quality_score']}/100", "bi-trophy",
                         "success" if ov['quality_score'] >= 80 else "warning" if ov['quality_score'] >= 60 else "danger"),
             _metric_card("内存", f"{ov['memory_mb']} MB", "bi-memory", "secondary"),
-        ], className="mb-4"),
+        ], className="mb-4 stagger-container"),
 
         # 第二行：数据类型分布 + 缺失值概览
         dbc.Row([
@@ -93,8 +94,8 @@ def create_dashboard_page() -> html.Div:
                             style={"height": "280px"}
                         )
                     ])
-                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=4),
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=4, className="stagger-item"),
 
             # 缺失值热图
             dbc.Col([
@@ -107,9 +108,9 @@ def create_dashboard_page() -> html.Div:
                             style={"height": "280px"}
                         )
                     ])
-                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=8),
-        ], className="mb-4"),
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=8, className="stagger-item"),
+        ], className="mb-4 stagger-container"),
 
         # 第三行：数值列摘要 + 问题和建议
         dbc.Row([
@@ -121,8 +122,8 @@ def create_dashboard_page() -> html.Div:
                         _numeric_summary_table(df) if numeric_cols else
                         html.P("无数值列", className="text-muted text-center py-3")
                     ], style={"maxHeight": "350px", "overflowY": "auto"})
-                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=7),
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=7, className="stagger-item"),
 
             # 问题 & 建议
             dbc.Col([
@@ -134,9 +135,9 @@ def create_dashboard_page() -> html.Div:
                     dbc.CardBody([
                         _issues_list(analysis['issues'], analysis['recommendations'])
                     ], style={"maxHeight": "350px", "overflowY": "auto"})
-                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=5),
-        ], className="mb-4"),
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=5, className="stagger-item"),
+        ], className="mb-4 stagger-container"),
 
         # 第四行：类型不匹配建议 + 快捷操作
         dbc.Row([
@@ -151,8 +152,8 @@ def create_dashboard_page() -> html.Div:
                         _type_suggestions(mismatches) if mismatches else
                         html.P("所有列类型匹配正确 ✓", className="text-muted text-center py-3")
                     ])
-                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=6),
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=6, className="stagger-item"),
 
             # 快捷导航
             dbc.Col([
@@ -178,9 +179,9 @@ def create_dashboard_page() -> html.Div:
                             ], href="/advanced", action=True, className="d-flex align-items-center"),
                         ], flush=True)
                     ])
-                ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=6),
-        ]),
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=6, className="stagger-item"),
+        ], className="stagger-container"),
 
     ], fluid=True, className="py-4")
 
@@ -199,7 +200,7 @@ def _metric_card(label: str, value: str, icon: str, color: str) -> dbc.Col:
                     ]),
                 ], className="d-flex align-items-center gap-3")
             ], style={"padding": "1rem"})
-        ], color=color, outline=True,
+        ], color=color, outline=True, className="card-hover stagger-item",
             style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
     ], width=2)
 

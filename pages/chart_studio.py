@@ -53,7 +53,7 @@ def create_chart_studio_page() -> html.Div:
                 labelStyle={'marginRight': '20px'}
             ),
             html.Div(id='library-info', className='library-info text-muted ms-3')
-        ], className='library-switcher p-3 bg-secondary border-bottom'),
+        ], className='library-switcher p-3 bg-secondary border-bottom fade-in'),
 
         # 主内容区
         dbc.Row([
@@ -77,7 +77,7 @@ def create_chart_studio_page() -> html.Div:
                         children=create_plotly_params_panel(df) if df is not None else html.Div()
                     ),
 
-                ], className='p-3')
+                ], className='p-3 slide-in-left')
             ], width=3, className='bg-secondary border-end', style={'height': 'calc(100vh - 140px)', 'overflowY': 'auto'}),
 
             # 中间：图表画布
@@ -90,19 +90,19 @@ def create_chart_studio_page() -> html.Div:
                                    className='placeholder-text mt-3')
                         ], className='chart-placeholder text-center',
                            style={'paddingTop': '100px'})
-                    ], style={'height': '60%', 'borderBottom': '1px solid #333'}),
+                    ], className='fade-in', style={'height': '60%', 'borderBottom': '1px solid #333'}),
 
                     # 导出按钮行
                     html.Div([
                         dbc.Button([
                             html.I(className="bi bi-file-image me-1"), "导出PNG"
-                        ], id='export-png-btn', color='outline-primary', size='sm', className='me-2'),
+                        ], id='export-png-btn', color='outline-primary', size='sm', className='me-2 btn-hover'),
                         dbc.Button([
                             html.I(className="bi bi-filetype-svg me-1"), "导出SVG"
-                        ], id='export-svg-btn', color='outline-info', size='sm', className='me-2'),
+                        ], id='export-svg-btn', color='outline-info', size='sm', className='me-2 btn-hover'),
                         dbc.Button([
                             html.I(className="bi bi-filetype-html me-1"), "导出HTML"
-                        ], id='export-html-btn', color='outline-success', size='sm'),
+                        ], id='export-html-btn', color='outline-success', size='sm', className='btn-hover'),
                     ], className='d-flex p-2 border-bottom', style={'backgroundColor': 'var(--bg-secondary)'}),
 
                     # 代码预览面板
@@ -282,7 +282,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
             id='toggle-advanced-params',
             size='sm',
             color='link',
-            className='mb-2'
+            className='mb-2 btn-hover'
         ),
 
         dbc.Collapse([

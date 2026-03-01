@@ -69,7 +69,8 @@ def create_step_panel(pipeline: List[Dict], step_manager: StepManager = None) ->
                             size="sm",
                             color="info",
                             outline=True,
-                            title="编辑步骤"
+                            title="编辑步骤",
+                            className="btn-hover"
                         ),
                         dbc.Button(
                             html.I(className="bi bi-trash"),
@@ -77,7 +78,8 @@ def create_step_panel(pipeline: List[Dict], step_manager: StepManager = None) ->
                             size="sm",
                             color="danger",
                             outline=True,
-                            title="删除步骤"
+                            title="删除步骤",
+                            className="btn-hover"
                         ),
                     ], size="sm"),
                 ], className="mt-2"),
@@ -122,11 +124,11 @@ def create_step_actions() -> html.Div:
             dbc.Button([
                 html.I(className="bi bi-download me-2"),
                 "导出代码"
-            ], id="btn-export-code", color="primary", size="sm", outline=True),
+            ], id="btn-export-code", color="primary", size="sm", outline=True, className="btn-hover"),
             dbc.Button([
                 html.I(className="bi bi-trash me-2"),
                 "清空步骤"
-            ], id="btn-clear-steps", color="danger", size="sm", outline=True),
+            ], id="btn-clear-steps", color="danger", size="sm", outline=True, className="btn-hover"),
         ], className="w-100"),
     ])
 
