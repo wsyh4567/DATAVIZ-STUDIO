@@ -1,0 +1,473 @@
+/* ═══════════════════════════════════════════════════════════
+   DataViz Studio — Animations & Micro-interactions
+   现代化动画库 - 提升用户体验
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Keyframes ──────────────────────────────────────────── */
+
+/* 淡入动画 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* 从下方滑入 */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 从上方滑入 */
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 从左侧滑入 */
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* 从右侧滑入 */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* 缩放进入 */
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* 发光动画 */
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(14, 165, 233, 0.6);
+    }
+}
+
+/* 旋转加载 */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 弹跳动画 */
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* 摇晃动画 */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-5px);
+    }
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+/* 渐变背景动画 */
+@keyframes gradientShift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* 骨架屏加载动画 */
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+/* 进度条动画 */
+@keyframes progress {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* ── Animation Classes ──────────────────────────────────── */
+
+/* 淡入效果 */
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* 滑入效果 */
+.animate-slide-in-up {
+    animation: slideInUp 0.5s ease-out;
+}
+
+.animate-slide-in-down {
+    animation: slideInDown 0.5s ease-out;
+}
+
+.animate-slide-in-left {
+    animation: slideInLeft 0.5s ease-out;
+}
+
+.animate-slide-in-right {
+    animation: slideInRight 0.5s ease-out;
+}
+
+/* 缩放效果 */
+.animate-scale-in {
+    animation: scaleIn 0.3s ease-out;
+}
+
+/* 脉冲效果 */
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 发光效果 */
+.animate-glow {
+    animation: glow 2s ease-in-out infinite;
+}
+
+/* 旋转加载 */
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* 弹跳效果 */
+.animate-bounce {
+    animation: bounce 1s ease-in-out infinite;
+}
+
+/* 摇晃效果 */
+.animate-shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* ── Skeleton Loading ───────────────────────────────────── */
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-secondary) 0%,
+        var(--bg-tertiary) 50%,
+        var(--bg-secondary) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: var(--radius-md);
+}
+
+.skeleton-text {
+    height: 1em;
+    margin-bottom: 0.5em;
+}
+
+.skeleton-title {
+    height: 1.5em;
+    width: 60%;
+    margin-bottom: 1em;
+}
+
+.skeleton-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.skeleton-card {
+    height: 200px;
+    width: 100%;
+}
+
+/* ── Hover Effects ──────────────────────────────────────── */
+
+/* 悬停上浮 */
+.hover-lift {
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* 悬停发光 */
+.hover-glow {
+    transition: box-shadow var(--transition-base);
+}
+
+.hover-glow:hover {
+    box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
+}
+
+/* 悬停缩放 */
+.hover-scale {
+    transition: transform var(--transition-base);
+}
+
+.hover-scale:hover {
+    transform: scale(1.05);
+}
+
+/* 悬停旋转 */
+.hover-rotate {
+    transition: transform var(--transition-base);
+}
+
+.hover-rotate:hover {
+    transform: rotate(5deg);
+}
+
+/* ── Button Animations ──────────────────────────────────── */
+
+.btn-ripple {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-ripple::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn-ripple:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* 按钮加载状态 */
+.btn-loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+/* ── Progress Indicators ────────────────────────────────── */
+
+/* 进度条 */
+.progress-bar {
+    position: relative;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.progress-bar__fill {
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        var(--accent-primary),
+        var(--accent-secondary)
+    );
+    border-radius: var(--radius-full);
+    transition: width 0.3s ease;
+}
+
+/* 不确定进度条 */
+.progress-bar--indeterminate .progress-bar__fill {
+    width: 30% !important;
+    animation: progress 1.5s ease-in-out infinite;
+}
+
+/* 加载点 */
+.loading-dots {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.loading-dots span {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    animation: bounce 1.4s ease-in-out infinite;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+/* ── Page Transitions ───────────────────────────────────── */
+
+.page-enter {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.page-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.page-exit {
+    opacity: 1;
+}
+
+.page-exit-active {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+/* ── Notification Animations ────────────────────────────── */
+
+.toast-enter {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.toast-enter-active {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast-exit {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-exit-active {
+    opacity: 0;
+    transform: translateX(100%);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* ── Stagger Animations ─────────────────────────────────── */
+
+.stagger-item {
+    opacity: 0;
+    animation: slideInUp 0.5s ease-out forwards;
+}
+
+.stagger-item:nth-child(1) { animation-delay: 0.05s; }
+.stagger-item:nth-child(2) { animation-delay: 0.1s; }
+.stagger-item:nth-child(3) { animation-delay: 0.15s; }
+.stagger-item:nth-child(4) { animation-delay: 0.2s; }
+.stagger-item:nth-child(5) { animation-delay: 0.25s; }
+.stagger-item:nth-child(6) { animation-delay: 0.3s; }
+.stagger-item:nth-child(7) { animation-delay: 0.35s; }
+.stagger-item:nth-child(8) { animation-delay: 0.4s; }
+
+/* ── Utility Classes ────────────────────────────────────── */
+
+/* 禁用动画（用户偏好） */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* 延迟动画 */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* 动画速度 */
+.duration-fast { animation-duration: 0.2s; }
+.duration-normal { animation-duration: 0.3s; }
+.duration-slow { animation-duration: 0.5s; }
