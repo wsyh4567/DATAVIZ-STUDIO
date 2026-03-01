@@ -36,7 +36,9 @@ def create_data_hub_page() -> html.Div:
     # Source cards
     source_cards = []
     for src in DATA_SOURCES:
-        cls = "dvs-source-card" if src["enabled"] else "dvs-source-card dvs-source-card--disabled"
+        cls = "dvs-source-card card-hover stagger-item"
+        if not src["enabled"]:
+            cls += " dvs-source-card--disabled"
         card = html.Div(
             className=cls,
             children=[
@@ -54,13 +56,13 @@ def create_data_hub_page() -> html.Div:
             html.H2("📁 数据中心", className="dvs-page-title"),
 
             # Source type cards
-            html.Div(className="dvs-source-cards", children=source_cards),
+            html.Div(className="dvs-source-cards stagger-container", children=source_cards),
 
             # Upload zone
             dcc.Upload(
                 id="datahub-upload",
                 children=html.Div(
-                    className="dvs-upload-zone",
+                    className="dvs-upload-zone fade-in",
                     children=[
                         html.Div("📂", className="dvs-upload-zone__icon"),
                         html.Div("拖拽文件到此处，或点击选择文件", className="dvs-upload-zone__title"),
@@ -335,7 +337,9 @@ def update_dataset_list(store_data):
     items = []
     for meta in datasets:
         is_active = meta.name == active
-        cls = "dvs-dataset-item dvs-dataset-item--active" if is_active else "dvs-dataset-item"
+        cls = "dvs-dataset-item card-hover stagger-item"
+        if is_active:
+            cls += " dvs-dataset-item--active"
         items.append(
             html.Div(
                 className=cls,
@@ -371,4 +375,4 @@ def update_dataset_list(store_data):
             )
         )
 
-    return html.Div(items), f"{len(datasets)} 个数据集"
+    return html.Div(className="stagger-container", children=items), f"{len(datasets)} 个数据集"

@@ -71,13 +71,20 @@ def create_welcome_page() -> html.Div:
 def _sample_button(btn_id: str, label: str, desc: str) -> html.Button:
     return html.Button(
         children=[
-            html.Span(label),
+            html.Span(label, style={"fontSize": "var(--text-base)", "fontWeight": "var(--font-semibold)"}),
             html.Br(),
-            html.Span(desc, style={"fontSize": "var(--text-xs)", "color": "var(--text-muted)"}),
+            html.Span(desc, style={"fontSize": "var(--text-xs)", "color": "var(--text-muted)", "fontWeight": "var(--font-normal)"}),
         ],
         id=btn_id,
-        className="dvs-btn",
-        style={"flexDirection": "column", "padding": "var(--sp-3) var(--sp-5)", "minWidth": "160px"},
+        className="dvs-btn card-hover stagger-item",
+        style={
+            "flexDirection": "column",
+            "padding": "var(--sp-4) var(--sp-5)",
+            "minWidth": "200px",
+            "minHeight": "100px",
+            "textAlign": "center",
+            "gap": "var(--sp-2)",
+        },
     )
 
 

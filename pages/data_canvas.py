@@ -53,7 +53,7 @@ def create_data_canvas_page() -> html.Div:
             html.H2("📊 数据画布", className="dvs-page-title"),
 
             # Overview stat cards row
-            html.Div(id="canvas-stats-row", className="dvs-stats-row"),
+            html.Div(id="canvas-stats-row", className="dvs-stats-row stagger-container"),
 
             # Data view selector (for large datasets)
             html.Div(
@@ -223,7 +223,7 @@ def _stat_card(
     if color:
         value_style["color"] = color
     return html.Div(
-        className="dvs-stat-card",
+        className="dvs-stat-card card-hover stagger-item",
         children=[
             html.Span(label, className="dvs-stat-card__label"),
             html.Span(value, className="dvs-stat-card__value", style=value_style),
