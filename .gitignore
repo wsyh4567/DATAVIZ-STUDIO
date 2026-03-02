@@ -28,3 +28,13 @@ desktop.ini
 *.dvs
 uploads/
 cache/
+
+# Logs and coverage
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.bak
