@@ -153,6 +153,35 @@ def layout():
                     ], style={"padding": "1rem", "maxHeight": "600px", "overflowY": "auto"})
                 ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
             ], width=3, className="slide-in-right"),
+        ], className="mb-4"),
+
+        # 底部：Python 代码预览区（可折叠）
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.Div([
+                            html.Div([
+                                html.I(className="bi bi-code-slash me-2", style={"color": "var(--accent)"}),
+                                html.Span("Python 代码预览", style={"fontWeight": "bold"}),
+                            ], className="d-flex align-items-center"),
+                            dbc.Button([
+                                html.I(id="code-collapse-icon", className="bi bi-chevron-up")
+                            ], id="btn-toggle-code", color="link", size="sm", className="p-0")
+                        ], className="d-flex align-items-center justify-content-between")
+                    ]),
+                    dbc.Collapse([
+                        dbc.CardBody([
+                            html.Div(id="inline-code-display", children=[
+                                html.Pre([
+                                    html.Code("# 暂无操作\n# 请先执行一些数据操作",
+                                             style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
+                                ], style={"backgroundColor": "var(--bg-primary)", "padding": "1rem", "borderRadius": "8px"})
+                            ])
+                        ], style={"padding": "1rem"})
+                    ], id="code-collapse", is_open=True)
+                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ], width=12, className="fade-in")
         ]),
 
         # 数据存储
@@ -561,38 +590,39 @@ def _build_form_for_operation(op_type, columns):
     Output('data-table-container', 'children'),
     Output('data-stats', 'children'),
     Input('btn-load-sample', 'n_clicks'),
-    Input('dm-loaded', 'data'),
-    prevent_initial_call=True
+    State('dm-loaded', 'data'),
+    prevent_initial_call=False  # 允许初始调用以自动加载数据
 )
 def load_data(n_clicks, dm_loaded):
     """加载数据：优先从 DataManager，否则加载示例"""
-    triggered_id = ctx.triggered_id
-
-    if triggered_id == 'dm-loaded' and dm_loaded:
-        dm = DataManager()
-        df = dm.active_df
-        if df is not None and not df.empty:
-            table = create_data_grid(df, preview_mode=False)
-            stats = create_data_stats(df)
-            return df.to_json(date_format='iso', orient='split'), table, stats
-        return no_update, no_update, no_update
-
-    # 加载示例数据
-    df = pd.DataFrame({
-        'name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank', 'Grace', 'Henry'],
-        'age': ['25', '30', '35', '28', '32', '29', '31', '27'],
-        'city': ['NYC', 'LA', 'SF', 'NYC', 'LA', 'SF', 'NYC', 'LA'],
-        'salary': [50000, 60000, 75000, 55000, 65000, 58000, 62000, 53000],
-        'department': ['Sales', 'Engineering', 'Sales', 'Engineering', 'Sales', 'Engineering', 'Sales', 'Engineering']
-    })
-
-    # 也存入 DataManager
     dm = DataManager()
-    dm.add_dataset("示例数据", df, source="sample:demo")
 
-    table = create_data_grid(df, preview_mode=False)
-    stats = create_data_stats(df)
-    return df.to_json(date_format='iso', orient='split'), table, stats
+    # 首先尝试从 DataManager 加载活跃数据集
+    if dm.active_df is not None and not dm.active_df.empty:
+        df = dm.active_df
+        table = create_data_grid(df, preview_mode=False)
+        stats = create_data_stats(df)
+        return df.to_json(date_format='iso', orient='split'), table, stats
+
+    # 如果点击了加载示例按钮
+    if n_clicks:
+        df = pd.DataFrame({
+            'name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank', 'Grace', 'Henry'],
+            'age': ['25', '30', '35', '28', '32', '29', '31', '27'],
+            'city': ['NYC', 'LA', 'SF', 'NYC', 'LA', 'SF', 'NYC', 'LA'],
+            'salary': [50000, 60000, 75000, 55000, 65000, 58000, 62000, 53000],
+            'department': ['Sales', 'Engineering', 'Sales', 'Engineering', 'Sales', 'Engineering', 'Sales', 'Engineering']
+        })
+
+        # 存入 DataManager
+        dm.add_dataset("示例数据", df, source="sample:demo")
+
+        table = create_data_grid(df, preview_mode=False)
+        stats = create_data_stats(df)
+        return df.to_json(date_format='iso', orient='split'), table, stats
+
+    # 没有数据时返回空状态
+    return no_update, no_update, no_update
 
 
 # ============================================================================
@@ -1024,38 +1054,78 @@ def handle_undo_redo(undo_clicks, redo_clicks, original_data):
 
 
 # ============================================================================
+# 回调：代码折叠切换
+# ============================================================================
+
+@callback(
+    Output('code-collapse', 'is_open'),
+    Output('code-collapse-icon', 'className'),
+    Input('btn-toggle-code', 'n_clicks'),
+    State('code-collapse', 'is_open'),
+    prevent_initial_call=True
+)
+def toggle_code_collapse(n_clicks, is_open):
+    """切换代码预览区的折叠状态"""
+    new_state = not is_open
+    icon_class = "bi bi-chevron-up" if new_state else "bi bi-chevron-down"
+    return new_state, icon_class
+
+
+# ============================================================================
 # 回调：代码生成
 # ============================================================================
 
 @callback(
     Output('code-preview-modal', 'is_open'),
     Output('code-display-area', 'children'),
+    Output('inline-code-display', 'children'),
     Input('btn-view-code', 'n_clicks'),
     Input('btn-close-code-modal', 'n_clicks'),
-    State('pipeline-store', 'data'),
+    Input('pipeline-store', 'data'),
     State('code-preview-modal', 'is_open'),
-    prevent_initial_call=True
+    prevent_initial_call=False
 )
 def handle_code_preview(view_clicks, close_clicks, pipeline, is_open):
-    """处理代码预览"""
+    """处理代码预览 - 同时更新模态框和内联显示"""
     triggered_id = ctx.triggered_id
 
-    if triggered_id == 'btn-view-code':
-        if not pipeline:
-            code = "# 暂无操作\n# 请先执行一些数据操作"
-        else:
-            code = code_generator.generate_code(
-                pipeline,
-                data_source='data.csv',
-                include_imports=True,
-                include_comments=True
-            )
+    # 获取数据集名称
+    dm = DataManager()
+    dataset_name = dm.active_name if dm.active_name else "data.csv"
 
+    # 生成代码
+    if not pipeline:
+        code = "# 暂无操作\n# 请先执行一些数据操作"
+    else:
+        code = code_generator.generate_code(
+            pipeline,
+            data_source=dataset_name,
+            include_imports=True,
+            include_comments=True
+        )
+
+    # 创建内联代码显示
+    inline_display = html.Pre([
+        html.Code(code, style={
+            "color": "var(--text-primary)",
+            "fontSize": "0.875rem",
+            "fontFamily": "monospace"
+        })
+    ], style={
+        "backgroundColor": "var(--bg-primary)",
+        "padding": "1rem",
+        "borderRadius": "8px",
+        "maxHeight": "400px",
+        "overflowY": "auto"
+    })
+
+    if triggered_id == 'btn-view-code':
         from components.data_workshop.code_preview_panel import create_code_preview_panel
         code_display = create_code_preview_panel(code, show_header=False)
-        return True, code_display
+        return True, code_display, inline_display
 
     elif triggered_id == 'btn-close-code-modal':
-        return False, no_update
+        return False, no_update, inline_display
 
-    return no_update, no_update
+    # 默认情况（pipeline 更新时）
+    return no_update, no_update, inline_display
