@@ -16,6 +16,8 @@
     --accent-hover: #6366F1;
     --accent-light: rgba(79, 70, 229, 0.08);
     --accent-glow: rgba(79, 70, 229, 0.15);
+    --accent-primary: #4F46E5;
+    --accent-secondary: #6366F1;
 
     /* Text */
     --text-primary: #0F172A;
@@ -35,12 +37,20 @@
     /* Border */
     --border: #E2E8F0;
     --border-hover: #CBD5E1;
+    --border-glow: rgba(79, 70, 229, 0.2);
+    --border-glow-hover: rgba(79, 70, 229, 0.4);
 
     /* Shadows */
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
     --shadow-glow: 0 0 20px var(--accent-glow);
+
+    /* Glass effect for light theme */
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-bg-strong: rgba(255, 255, 255, 0.95);
+    --glass-blur: 12px;
+    --glass-blur-strong: 16px;
 }
 
 /* Light theme scrollbar */
@@ -50,6 +60,48 @@
 
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
     background: var(--border-hover);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   Dash DataTable Styling
+   ═══════════════════════════════════════════════════════════ */
+
+/* Dark theme DataTable */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner table {
+    color: var(--text-primary) !important;
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td,
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border) !important;
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+    background-color: var(--bg-tertiary) !important;
+    font-weight: 600 !important;
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tr:hover td {
+    background-color: var(--bg-hover) !important;
+}
+
+/* Light theme DataTable */
+[data-theme="light"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td,
+[data-theme="light"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border) !important;
+}
+
+[data-theme="light"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+    background-color: var(--bg-tertiary) !important;
+}
+
+[data-theme="light"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tr:hover td {
+    background-color: var(--bg-hover) !important;
 }
 
 
