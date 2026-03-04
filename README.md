@@ -516,7 +516,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ### 4. 文件上传失败
 
 - 检查文件格式（支持 CSV、Excel、JSON）
-- 确保文件大小不超过 200MB
+- 确保文件大小不超过 500MB
 - 检查文件编码（推荐 UTF-8）
 
 ---

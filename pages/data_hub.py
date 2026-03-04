@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import io
 
-from dash import html, dcc, Input, Output, State, callback, no_update, ctx
+from dash import html, dcc, Input, Output, State, callback, no_update, ctx, ALL, MATCH
 import dash_bootstrap_components as dbc
 import pandas as pd
 
@@ -66,10 +66,10 @@ def create_data_hub_page() -> html.Div:
                     children=[
                         html.Div("📂", className="dvs-upload-zone__icon"),
                         html.Div("拖拽文件到此处，或点击选择文件", className="dvs-upload-zone__title"),
-                        html.Div("支持 CSV、Excel (.xlsx)、JSON 格式", className="dvs-upload-zone__hint"),
+                        html.Div("支持 CSV、TSV、Excel (.xlsx/.xls)、JSON、Parquet、Feather 格式", className="dvs-upload-zone__hint"),
                     ],
                 ),
-                multiple=False,
+                multiple=True,
                 style={"marginBottom": "var(--sp-4)"},
             ),
 
@@ -174,31 +174,41 @@ def create_data_hub_page() -> html.Div:
     prevent_initial_call=True,
 )
 def on_datahub_upload(contents, filename, store_data):
-    """数据中心文件上传。"""
+    """数据中心文件上传（支持多文件）。"""
     if contents is None or filename is None:
         return no_update, no_update
 
-    try:
-        content_type, content_string = contents.split(",")
-        decoded = base64.b64decode(content_string)
+    # 统一为列表格式（兼容单文件和多文件）
+    if isinstance(contents, str):
+        contents = [contents]
+        filename = [filename]
 
-        dm = DataManager()
-        df = load_file(decoded, filename)
+    store_data = store_data or {}
+    dm = DataManager()
+    loaded = []
+    errors = []
 
-        name = dm.add_dataset(filename, df, source=f"file:{filename}")
+    for content, fname in zip(contents, filename):
+        try:
+            content_type, content_string = content.split(",")
+            decoded = base64.b64decode(content_string)
+            df = load_file(decoded, fname)
+            name = dm.add_dataset(fname, df, source=f"file:{fname}")
+            loaded.append(f"{name}({len(df)}行)")
+        except Exception as e:
+            errors.append(f"{fname}: {e}")
 
-        store_data = store_data or {}
-        store_data["active_dataset"] = name
+    if loaded:
+        store_data["active_dataset"] = dm.active_name
         store_data["datasets"] = dm.dataset_names
-        store_data["toast"] = {
-            "message": f"已加载 {name}（{len(df)} 行 × {len(df.columns)} 列）",
-            "type": "success",
-        }
+        msg = f"已加载 {len(loaded)} 个文件：{', '.join(loaded)}"
+        if errors:
+            msg += f"；{len(errors)} 个失败"
+        store_data["toast"] = {"message": msg, "type": "success"}
         return store_data, "/canvas"
-    except Exception as e:
-        store_data = store_data or {}
-        store_data["toast"] = {"message": f"加载失败：{str(e)}", "type": "error"}
-        return store_data, no_update
+
+    store_data["toast"] = {"message": f"全部加载失败：{'; '.join(errors)}", "type": "error"}
+    return store_data, no_update
 
 
 # ── URL 导入 ──────────────────────────────────────────
@@ -376,3 +386,67 @@ def update_dataset_list(store_data):
         )
 
     return html.Div(className="stagger-container", children=items), f"{len(datasets)} 个数据集"
+
+
+# ── 设为活跃数据集 ────────────────────────────────────
+
+@callback(
+    Output("app-store", "data", allow_duplicate=True),
+    Input({"type": "activate-btn", "index": ALL}, "n_clicks"),
+    State("app-store", "data"),
+    prevent_initial_call=True,
+)
+def activate_dataset(n_clicks_list, store_data):
+    """点击'设为活跃'按钮时切换活跃数据集。"""
+    if not any(n_clicks_list):
+        return no_update
+
+    triggered = ctx.triggered_id
+    if not triggered or not isinstance(triggered, dict):
+        return no_update
+
+    name = triggered["index"]
+    dm = DataManager()
+    if name in dm.dataset_names:
+        dm.active_name = name
+        store_data = store_data or {}
+        store_data["active_dataset"] = name
+        store_data["datasets"] = dm.dataset_names
+        store_data["toast"] = {
+            "message": f"已切换活跃数据集为：{name}",
+            "type": "success",
+        }
+        return store_data
+
+    return no_update
+
+
+# ── 删除数据集 ────────────────────────────────────────
+
+@callback(
+    Output("app-store", "data", allow_duplicate=True),
+    Input({"type": "delete-btn", "index": ALL}, "n_clicks"),
+    State("app-store", "data"),
+    prevent_initial_call=True,
+)
+def delete_dataset(n_clicks_list, store_data):
+    """点击'删除'按钮时移除数据集。"""
+    if not any(n_clicks_list):
+        return no_update
+
+    triggered = ctx.triggered_id
+    if not triggered or not isinstance(triggered, dict):
+        return no_update
+
+    name = triggered["index"]
+    dm = DataManager()
+    dm.remove_dataset(name)
+
+    store_data = store_data or {}
+    store_data["active_dataset"] = dm.active_name
+    store_data["datasets"] = dm.dataset_names
+    store_data["toast"] = {
+        "message": f"已删除数据集：{name}",
+        "type": "info",
+    }
+    return store_data

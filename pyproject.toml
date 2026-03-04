@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "dataviz-studio"
@@ -29,6 +29,8 @@ dependencies = [
     "numpy>=1.24",
     "openpyxl>=3.1",
     "chardet>=5.0",
+    "seaborn>=0.12",
+    "matplotlib>=3.7",
 ]
 
 [project.optional-dependencies]

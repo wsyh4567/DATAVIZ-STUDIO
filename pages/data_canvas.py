@@ -1,18 +1,13 @@
 # -*- coding: utf-8 -*-
 """DataViz Studio — 数据画布页
 
-AG Grid 高性能数据表格 + 数据概览卡片。
+AG Grid 高性能数据表格 + 数据概览卡片 + 数据导出。
 """
 
 from __future__ import annotations
-import sys
 import io
 
-# 设置标准输出编码为 UTF-8
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-
-from dash import html, dcc, Input, Output, State, callback, no_update
+from dash import html, dcc, Input, Output, State, callback, no_update, ctx
 
 from core.data_manager import DataManager
 from components.data_table import create_data_table
@@ -101,6 +96,19 @@ def create_data_canvas_page() -> html.Div:
 
             # AG Grid table
             html.Div(id="canvas-table-container"),
+
+            # 数据导出按钮行
+            html.Div(
+                className="dvs-preview-control",
+                style={"marginTop": "var(--sp-3)", "display": "flex", "gap": "var(--sp-2)", "alignItems": "center"},
+                children=[
+                    html.Span("导出数据：", style={"color": "var(--text-secondary)", "marginRight": "var(--sp-2)"}),
+                    html.Button("CSV", id="btn-export-csv", className="dvs-btn dvs-btn--sm btn-hover"),
+                    html.Button("Excel", id="btn-export-excel", className="dvs-btn dvs-btn--sm btn-hover"),
+                    html.Button("JSON", id="btn-export-json", className="dvs-btn dvs-btn--sm btn-hover"),
+                ],
+            ),
+            dcc.Download(id="download-data-file"),
         ]
     )
 
@@ -230,3 +238,33 @@ def _stat_card(
             html.Span(sub, className="dvs-stat-card__sub"),
         ],
     )
+
+
+# ── 数据导出回调 ─────────────────────────────────────
+
+@callback(
+    Output("download-data-file", "data"),
+    Input("btn-export-csv", "n_clicks"),
+    Input("btn-export-excel", "n_clicks"),
+    Input("btn-export-json", "n_clicks"),
+    prevent_initial_call=True,
+)
+def export_data(csv_clicks, excel_clicks, json_clicks):
+    """将当前活跃数据集导出为 CSV / Excel / JSON。"""
+    dm = DataManager()
+    df = dm.active_df
+    if df is None:
+        return no_update
+
+    name = dm.active_name or "data"
+    triggered = ctx.triggered_id
+
+    if triggered == "btn-export-csv":
+        return dcc.send_data_frame(df.to_csv, f"{name}.csv", index=False)
+    elif triggered == "btn-export-excel":
+        return dcc.send_data_frame(df.to_excel, f"{name}.xlsx", index=False)
+    elif triggered == "btn-export-json":
+        return dcc.send_data_frame(
+            df.to_json, f"{name}.json", orient="records", force_ascii=False,
+        )
+    return no_update

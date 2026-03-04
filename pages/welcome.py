@@ -42,7 +42,7 @@ def create_welcome_page() -> html.Div:
                             children=[
                                 html.Div("📂", className="dvs-upload-zone__icon"),
                                 html.Div("拖拽文件到此处，或点击选择文件", className="dvs-upload-zone__title"),
-                                html.Div("支持 CSV、Excel (.xlsx)、JSON 格式", className="dvs-upload-zone__hint"),
+                                html.Div("支持 CSV、TSV、Excel (.xlsx/.xls)、JSON、Parquet、Feather 格式", className="dvs-upload-zone__hint"),
                             ],
                         ),
                         multiple=False,

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """DataViz Studio — 全局配置"""
 
+import os
 from pathlib import Path
 from typing import Final
 
@@ -9,11 +10,12 @@ from typing import Final
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent
 ASSETS_DIR: Final[Path] = PROJECT_ROOT / "assets"
 UPLOAD_DIR: Final[Path] = PROJECT_ROOT / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── 服务器 ───────────────────────────────────────────
-HOST: Final[str] = "127.0.0.1"
-PORT: Final[int] = 8050
-DEBUG: Final[bool] = True
+HOST: str = os.environ.get("DATAVIZ_HOST", "127.0.0.1")
+PORT: int = int(os.environ.get("DATAVIZ_PORT", "8050"))
+DEBUG: bool = os.environ.get("DATAVIZ_DEBUG", "false").lower() == "true"
 
 # ── 应用元数据 ────────────────────────────────────────
 APP_NAME: Final[str] = "DataViz Studio"

@@ -5,12 +5,10 @@ Dash SPA 应用：顶栏 + 侧边栏 + 路由 + 状态栏 + 全局状态。
 """
 
 from __future__ import annotations
-import sys
-import io
+import os
+import logging
 
-# 设置标准输出编码为 UTF-8
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
 import dash
 from dash import Dash, html, dcc, Input, Output, State, callback, no_update
@@ -82,33 +80,23 @@ app.layout = html.Div(
 def route_page(pathname: str):
     """根据 URL 渲染对应页面。"""
     try:
-        # Lazy imports to avoid circular deps
-        from pages.welcome import create_welcome_page
-        from pages.data_hub import create_data_hub_page
-        from pages.data_canvas import create_data_canvas_page
-        from pages.chart_studio import create_chart_studio_page
-        from pages.data_workshop import layout as data_workshop_layout
-        from pages.statistics_lab import layout as statistics_lab_layout
-
         if pathname == "/canvas":
-            return create_data_canvas_page()
+            return pages.data_canvas.create_data_canvas_page()
         elif pathname == "/data":
-            return create_data_hub_page()
+            return pages.data_hub.create_data_hub_page()
         elif pathname == "/charts":
-            return create_chart_studio_page()
+            return pages.chart_studio.create_chart_studio_page()
         elif pathname == "/workshop":
-            return data_workshop_layout()
+            return pages.data_workshop.layout()
         elif pathname == "/stats":
-            return statistics_lab_layout()
+            return pages.statistics_lab.layout()
         elif pathname == "/dashboard":
-            from pages.dashboard import create_dashboard_page
-            return create_dashboard_page()
+            return pages.dashboard.create_dashboard_page()
         elif pathname == "/advanced":
-            from pages.advanced import create_advanced_page
-            return create_advanced_page()
+            return pages.advanced.create_advanced_page()
         else:
             # Default: welcome page
-            return create_welcome_page()
+            return pages.welcome.create_welcome_page()
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -160,38 +148,9 @@ def update_sidebar_active(pathname: str):
 
 # ── 侧边栏折叠 ────────────────────────────────────────
 
-# 使用clientside callback实现状态持久化
+# JS 已提取到 assets/js/sidebar-toggle.js
 app.clientside_callback(
-    """
-    function(n_clicks, current_class) {
-        if (!n_clicks) {
-            // 初始加载：从sessionStorage恢复状态
-            try {
-                const saved = sessionStorage.getItem('sidebar-collapsed');
-                if (saved === 'true') {
-                    return ['dvs-sidebar dvs-sidebar--collapsed', '▶'];
-                }
-            } catch (e) {
-                console.warn('SessionStorage unavailable:', e);
-            }
-            return window.dash_clientside.no_update;
-        }
-        
-        // 切换状态
-        const collapsed = (current_class || '').includes('dvs-sidebar--collapsed');
-        const newClass = collapsed ? 'dvs-sidebar' : 'dvs-sidebar dvs-sidebar--collapsed';
-        const newIcon = collapsed ? '◀' : '▶';
-        
-        // 保存到sessionStorage
-        try {
-            sessionStorage.setItem('sidebar-collapsed', (!collapsed).toString());
-        } catch (e) {
-            console.warn('SessionStorage unavailable:', e);
-        }
-        
-        return [newClass, newIcon];
-    }
-    """,
+    dash.ClientsideFunction(namespace="sidebar", function_name="toggle"),
     Output("sidebar", "className"),
     Output("sidebar-toggle-icon", "children"),
     Input("sidebar-toggle", "n_clicks"),
@@ -201,21 +160,26 @@ app.clientside_callback(
 
 # ── 主题切换 ───────────────────────────────────────────
 
+# JS 已提取到 assets/js/theme-toggle.js
 app.clientside_callback(
-    """
-    function(n_clicks) {
-        const root = document.getElementById('app-root');
-        if (!root) return window.dash_clientside.no_update;
-        const current = root.getAttribute('data-theme');
-        const next = current === 'dark' ? 'light' : 'dark';
-        root.setAttribute('data-theme', next);
-        return next;
-    }
-    """,
+    dash.ClientsideFunction(namespace="theme", function_name="toggle"),
     Output("theme-dummy", "children"),
     Input("btn-theme-toggle", "n_clicks"),
     prevent_initial_call=True,
 )
+
+
+# ── 关于弹窗 ───────────────────────────────────────────
+
+@callback(
+    Output("settings-modal", "is_open"),
+    Input("btn-settings", "n_clicks"),
+    State("settings-modal", "is_open"),
+    prevent_initial_call=True,
+)
+def toggle_settings_modal(n_clicks, is_open):
+    """切换关于弹窗。"""
+    return not is_open
 
 
 # ── 状态栏更新 ─────────────────────────────────────────
@@ -265,7 +229,6 @@ def show_toast(store_data):
 # ── 启动 ──────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import logging
     logging.basicConfig(level=logging.DEBUG)
     app.run(
         host=config.HOST,
