@@ -32,6 +32,14 @@
 4. **全面恢复 Seaborn 渲染**：彻底修复 Dash 组件状态造成的类别校验失效，同时优化了前后端双 Y 轴 (`ax.twinx()`) 堆叠图绘制能力。
 5. **底层 Bug 与交互修复**：剔除了导致 DataTable 分页报错“Dataset not found”的越界配置；升级全局 Toast 通知组件使其具备 4 秒自动消退功能。
 
+## 📸 产品展示 (Showcase)
+
+| 仪表板与质量透视 (Data Dashboard) | 数据清洗流水线 (Data Workshop) |
+| :---: | :---: |
+| <img src="assets/screenshots/showcase_home.png" width="400"> | <img src="assets/screenshots/showcase_workshop.png" width="400"> |
+| **多图探索与生成 (Chart Studio)** | **交互式机器学习 (ML Studio)** |
+| <img src="assets/screenshots/showcase_charts.png" width="400"> | <img src="assets/screenshots/showcase_ml.webp" width="400"> |
+
 ---
 
 ## ✨ 产品定位
