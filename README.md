@@ -36,9 +36,9 @@
 
 | 仪表板与质量透视 (Data Dashboard) | 数据清洗流水线 (Data Workshop) |
 | :---: | :---: |
-| <img src="assets/screenshots/showcase_home.png" width="400"> | <img src="assets/screenshots/showcase_workshop.png" width="400"> |
+| ![Data Dashboard](./assets/screenshots/showcase_home.png) | ![Data Workshop](./assets/screenshots/showcase_workshop.png) |
 | **多图探索与生成 (Chart Studio)** | **交互式机器学习 (ML Studio)** |
-| <img src="assets/screenshots/showcase_charts.png" width="400"> | <img src="assets/screenshots/showcase_ml.webp" width="400"> |
+| ![Chart Studio](./assets/screenshots/showcase_charts.png) | ![ML Studio](./assets/screenshots/showcase_ml.webp) |
 
 ---
 
