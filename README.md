@@ -5,12 +5,14 @@
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![Dash](https://img.shields.io/badge/Dash-2.14+-green.svg)](https://dash.plotly.com/)
 [![Plotly](https://img.shields.io/badge/Plotly-5.18+-orange.svg)](https://plotly.com/)
+[![Version](https://img.shields.io/badge/version-0.4.0-success.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
 ## 📖 目录
 
+- [近期更新](#-近期更新)
 - [产品定位](#-产品定位)
 - [核心特性](#-核心特性)
 - [技术架构](#-技术架构)
@@ -19,6 +21,16 @@
 - [项目结构](#-项目结构)
 - [功能路线图](#️-功能路线图)
 - [贡献指南](#-贡献指南)
+
+---
+
+## 📢 近期更新 (v0.4.0)
+
+1. **机器学习工作室增强**：新增基于 Prophet/ARIMA 的时间序列预测专区、交互式单样本推断，以及批量预估导出管道。
+2. **数据工坊重塑**：引入 Offcanvas（算子工具箱）集中管理处理算子，并改用 Modal 模态弹窗配置参数，释放画布操作空间。
+3. **Chart Studio 参数智能校验**：增加针对 Plotly 与 Seaborn 的特定图表入参错误拦截（如：提醒用数字字段做大小映射），在 UI 抛出明确修复建议。
+4. **全面恢复 Seaborn 渲染**：彻底修复 Dash 组件状态造成的类别校验失效，同时优化了前后端双 Y 轴 (`ax.twinx()`) 堆叠图绘制能力。
+5. **底层 Bug 与交互修复**：剔除了导致 DataTable 分页报错“Dataset not found”的越界配置；升级全局 Toast 通知组件使其具备 4 秒自动消退功能。
 
 ---
 
