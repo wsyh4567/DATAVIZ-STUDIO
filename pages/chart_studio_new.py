@@ -52,8 +52,8 @@ def create_chart_studio_page() -> html.Div:
             dcc.RadioItems(
                 id='chart-library-selector',
                 options=[
-                    {'label': ' 📊 Plotly（交互式）', 'value': 'plotly'},
-                    {'label': ' 📈 Seaborn（静态美化）', 'value': 'seaborn'}
+                    {'label': ' Plotly（交互式）', 'value': 'plotly'},
+                    {'label': ' Seaborn（静态美化）', 'value': 'seaborn'}
                 ],
                 value='plotly',
                 inline=True,
@@ -432,7 +432,10 @@ def toggle_advanced_params(n_clicks, is_open):
      Input('param-animation-frame', 'value'),
      Input('param-trendline', 'value'),
      Input('param-marginal-x', 'value'),
-     Input('param-marginal-y', 'value')],
+     Input('param-marginal-y', 'value'),
+     Input('param-hue', 'value'),
+     Input('param-palette', 'value'),
+     Input('param-style', 'value')],
     [State('chart-library-selector', 'value')],
     prevent_initial_call=True
 )
@@ -440,6 +443,7 @@ def generate_chart(
     chart_type, x, y, color, size, hover_data,
     facet_row, facet_col, animation_frame,
     trendline, marginal_x, marginal_y,
+    hue, palette, style_param,
     library
 ):
     """生成图表和代码"""
@@ -450,29 +454,28 @@ def generate_chart(
         return html.Div("请先加载数据"), "# 请先加载数据"
     
     if not x and not y:
-        return html.Div("请至少选择X轴或Y轴"), "# 请配置参数"
+        return html.Div([
+            html.I(className="bi bi-info-circle me-2", style={"color": "#718096"}),
+            html.Span("请至少选择 X 轴或 Y 轴字段", style={"color": "#718096"})
+        ], style={"paddingTop": "80px", "textAlign": "center"}), "# 请配置参数"
     
-    # 构建参数字典
+    # 根据图表库构建参数字典
     if library == 'plotly':
         params = {
-            'x': x,
-            'y': y,
-            'color': color,
-            'size': size,
-            'hover_data': hover_data,
-            'facet_row': facet_row,
-            'facet_col': facet_col,
-            'animation_frame': animation_frame,
-            'trendline': trendline,
-            'marginal_x': marginal_x,
+            'x': x, 'y': y, 'color': color, 'size': size,
+            'hover_data': hover_data, 'facet_row': facet_row,
+            'facet_col': facet_col, 'animation_frame': animation_frame,
+            'trendline': trendline, 'marginal_x': marginal_x,
             'marginal_y': marginal_y,
         }
     else:  # seaborn
+        # Seaborn 参数用 hue 而不是 color
         params = {
-            'x': x,
-            'y': y,
-            'hue': color,
+            'x': x, 'y': y,
+            'hue': hue or color,   # 优先用 param-hue，fallback 到 param-color
             'size': size,
+            'style': style_param,
+            'palette': palette or 'deep',
         }
     
     # 移除 None 值

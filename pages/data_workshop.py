@@ -66,123 +66,125 @@ def _get_columns_from_store(store_data):
 
 
 def layout():
-    """数据工坊页面布局"""
-    # 尝试从 DataManager 加载活跃数据集
+    """数据工坊页面布局 — 紧凑版
+
+    布局: [50px 图标条] [填充剩余的表格区] [可折叠右抽屉]
+    """
     dm = DataManager()
     has_active = dm.active_df is not None and not dm.active_df.empty
 
-    return dbc.Container([
-        # 标题栏
-        dbc.Row([
-            dbc.Col([
-                html.Div([
-                    html.H2([
-                        html.I(className="bi bi-magic me-3", style={"color": "var(--accent)"}),
-                        "数据工坊 - 实时预览"
-                    ], className="mb-2 fade-in", style={"fontWeight": "600"}),
-                    html.P("所见即所得的数据清洗和转换体验",
-                          className="fade-in", style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
-                ])
-            ], width=6),
-            dbc.Col([
-                html.Div([
-                    dbc.Button([
-                        html.I(className="bi bi-check2-circle me-2"),
-                        "应用到数据集"
-                    ], id="btn-apply-to-dataset", color="warning", size="sm", outline=True, className="me-2 btn-hover"),
-                    dbc.Button([
-                        html.I(className="bi bi-code-slash me-2"),
-                        "查看代码"
-                    ], id="btn-view-code", color="success", size="sm", outline=True, className="me-2 btn-hover"),
-                    dbc.Button([
-                        html.I(className="bi bi-download me-2"),
-                        "导出"
-                    ], id="btn-export", color="primary", size="sm", outline=True, className="btn-hover"),
-                ], className="d-flex justify-content-end fade-in")
-            ], width=6),
-        ], className="mb-4"),
+    return html.Div([
+        # ── 顶部工具栏 ──
+        html.Div([
+            html.Div([
+                # 抽屉切换按钮
+                dbc.Button([html.I(className="bi bi-list")],
+                           id="btn-toggle-left-drawer", color="link", size="sm",
+                           title="显示/隐藏左侧面板", className="btn-hover text-muted me-2", style={"padding": "0", "fontSize": "1.2rem"}),
+                html.I(className="bi bi-magic me-2", style={"color": "var(--accent)", "fontSize": "1.1rem"}),
+                html.Span("数据工坊", style={"fontWeight": "700", "fontSize": "1rem", "marginRight": "16px"}),
+                
+                # 新增：打开算子工具箱按钮
+                dbc.Button([html.I(className="bi bi-tools me-1"), "算子工具箱"],
+                           id="btn-open-toolbox", color="primary", size="sm", className="btn-hover"),
+            ], style={"display": "flex", "alignItems": "center"}),
 
-        # 主要内容区
-        dbc.Row([
-            # 左侧：操作工具栏
-            dbc.Col([
-                create_operation_toolbar()
-            ], width=2, className="slide-in-left"),
+            # 隐藏的 data-stats (满足后续回调依赖)
+            html.Div(id="data-stats", style={"display": "none"}),
 
-            # 中间：数据预览区
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
+        ], style={
+            "display": "flex",
+            "justifyContent": "flex-start",
+            "alignItems": "center",
+            "padding": "8px 16px",
+            "backgroundColor": "var(--bg-secondary)",
+            "border": "1px solid var(--border)",
+            "borderRadius": "10px",
+            "marginBottom": "8px",
+        }),
+
+        # ── 主内容：左抽屉 + 图标条 + 表格 ──
+        html.Div([
+            # 1. 左侧：可折叠抽屉（操作步骤 + 代码 + 应用导出按钮）
+            html.Div([
+                dbc.Accordion([
+                    dbc.AccordionItem([
+                        html.Div(id="step-header", children=create_step_header(0), style={"marginBottom": "8px"}),
+                        html.Div(id="step-list", children=create_step_panel([], step_manager),
+                                 style={"maxHeight": "30vh", "padding": "0 4px", "overflowY": "auto"}),
+                        html.Div([create_step_actions()], style={"borderTop": "1px solid var(--border)", "paddingTop": "8px", "marginTop": "8px"}),
                         html.Div([
-                            html.Span("数据预览", style={"fontWeight": "bold"}),
-                            html.Div(id="data-stats", children=[
-                                dbc.Badge("0 行", color="primary", className="me-1"),
-                                dbc.Badge("0 列", color="info"),
-                            ]),
-                        ], className="d-flex align-items-center justify-content-between")
-                    ]),
-                    dbc.CardBody([
-                        html.Div(id="data-table-container", children=[
-                            html.Div([
-                                html.I(className="bi bi-inbox", style={"fontSize": "3rem", "color": "var(--text-muted)"}),
-                                html.P("暂无数据", className="text-muted mt-3"),
-                                html.P("请先加载数据集", style={"color": "var(--text-muted)", "fontSize": "0.875rem"}),
-                            ], className="text-center py-5")
+                            dbc.Button([html.I(className="bi bi-check2-circle me-1"), "应用执行"],
+                                       id="btn-apply-to-dataset", color="warning", size="sm", outline=True, className="mt-2 w-100 btn-hover"),
+                            dbc.Button([html.I(className="bi bi-download me-1"), "导出数据"],
+                                       id="btn-export", color="primary", size="sm", outline=True, className="mt-2 text-nowrap w-100 btn-hover"),
+                        ], style={"borderTop": "1px solid var(--border)", "paddingTop": "8px", "marginTop": "8px"}),
+                    ], title="🔄 管线与操作步骤", item_id="tab-pipeline"),
+
+                    dbc.AccordionItem([
+                        html.Div(id="inline-code-display", children=[
+                            html.Pre(
+                                html.Code("# 暂无操作\n# 请先执行一些数据操作",
+                                          style={"color": "#a8b2c1", "fontSize": "0.72rem"}),
+                                style={
+                                    "backgroundColor": "#1e2533",
+                                    "padding": "10px", "borderRadius": "4px",
+                                    "margin": "0", "maxHeight": "30vh", "overflowY": "auto"
+                                }
+                            )
                         ]),
+                        dbc.Button([html.I(className="bi bi-clipboard me-1"), "复制代码"],
+                                   id="btn-copy-code", color="primary", size="sm", outline=True, className="mt-2 btn-hover w-100"),
+                        dcc.Download(id="download-code-file"),
+                        dbc.Button([html.I(className="bi bi-download me-1"), "下载 .py"],
+                                   id="btn-download-inline-code", color="success", size="sm", outline=True, className="mt-2 btn-hover w-100"),
+                    ], title="💻 Python 导出代码", item_id="tab-code")
+                ], active_item="tab-pipeline", id="workshop-sidebar-accordion", start_collapsed=False)
+            ], id="left-drawer",
+               style={
+                   "position": "relative",
+                   "marginRight": "8px",
+                   "border": "1px solid var(--border)",
+                   "borderRadius": "10px",
+                   "overflow": "hidden",
+                   "transition": "width 0.3s, opacity 0.3s",
+                   "width": "300px",
+                   "flexShrink": "0",
+               }),
 
-                        # 仅当没有活跃数据集时显示"加载示例数据"按钮
-                        html.Div([
-                            dbc.Button([
-                                html.I(className="bi bi-file-earmark-spreadsheet me-2"),
-                                "加载示例数据"
-                            ], id="btn-load-sample", color="primary", className="mt-3 btn-hover")
-                        ], className="text-center", style={"display": "none"} if has_active else {})
-                    ], style={"padding": "1rem"})
-                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=7, className="scale-in"),
+            # 3. 中间：数据预览（flex-grow: 1，占据剩余空间）
+            html.Div([
+                html.Div(id="data-table-container", children=[
+                    html.Div([
+                        html.I(className="bi bi-inbox", style={"fontSize": "3rem", "color": "var(--text-muted)"}),
+                        html.P("暂无数据", className="text-muted mt-3"),
+                        html.P("请先加载数据集", className="text-muted", style={"fontSize": "0.875rem"}),
+                    ], className="text-center py-5")
+                ]),
+                # 加载示例数据按钮
+                html.Div([
+                    dbc.Button([
+                        html.I(className="bi bi-file-earmark-spreadsheet me-2"),
+                        "加载示例数据"
+                    ], id="btn-load-sample", color="primary", size="sm", className="btn-hover")
+                ], className="text-center", style={"display": "none"} if has_active else {}),
+            ], style={
+                "flex": "1",
+                "minWidth": "0",
+                "overflow": "hidden",
+                "backgroundColor": "var(--bg-secondary)",
+                "border": "1px solid var(--border)",
+                "borderRadius": "10px",
+                "padding": "8px",
+                "marginLeft": "8px",
+            }),
 
-            # 右侧：步骤管理面板
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.Div(id="step-header", children=create_step_header(0))
-                    ]),
-                    dbc.CardBody([
-                        html.Div(id="step-list", children=create_step_panel([], step_manager)),
-                        create_step_actions(),
-                    ], style={"padding": "1rem", "maxHeight": "600px", "overflowY": "auto"})
-                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=3, className="slide-in-right"),
-        ], className="mb-4"),
-
-        # 底部：Python 代码预览区（可折叠）
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.Div([
-                            html.Div([
-                                html.I(className="bi bi-code-slash me-2", style={"color": "var(--accent)"}),
-                                html.Span("Python 代码预览", style={"fontWeight": "bold"}),
-                            ], className="d-flex align-items-center"),
-                            dbc.Button([
-                                html.I(id="code-collapse-icon", className="bi bi-chevron-up")
-                            ], id="btn-toggle-code", color="link", size="sm", className="p-0")
-                        ], className="d-flex align-items-center justify-content-between")
-                    ]),
-                    dbc.Collapse([
-                        dbc.CardBody([
-                            html.Div(id="inline-code-display", children=[
-                                html.Pre([
-                                    html.Code("# 暂无操作\n# 请先执行一些数据操作",
-                                             style={"color": "var(--text-muted)", "fontSize": "0.875rem"})
-                                ], style={"backgroundColor": "var(--bg-primary)", "padding": "1rem", "borderRadius": "8px"})
-                            ])
-                        ], style={"padding": "1rem"})
-                    ], id="code-collapse", is_open=True)
-                ], className="card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
-            ], width=12, className="fade-in")
-        ]),
+        ], style={
+            "display": "flex",
+            "gap": "0",
+            "height": "calc(100vh - 180px)",
+            "alignItems": "stretch",
+        }),
 
         # 数据存储
         dcc.Store(id='original-data-store'),
@@ -191,12 +193,31 @@ def layout():
         dcc.Store(id='undo-redo-store', data={'can_undo': False, 'can_redo': False}),
         dcc.Store(id='pending-operation-type', data=None),
         dcc.Store(id='dm-loaded', data=has_active),
+        dcc.Store(id='left-drawer-open', data=True),
 
-        # 操作配置模态框
-        _create_operation_modal(),
+        dcc.Store(id='left-drawer-open', data=True),
 
-        # 代码预览模态框
-        create_code_modal(),
+        # 抽屉式的算子工具箱
+        dbc.Offcanvas(
+            create_operation_toolbar(),
+            id="toolbox-offcanvas",
+            title="🛠️ 算子工具箱",
+            is_open=False,
+            placement="start",
+            style={"width": "260px"}
+        ),
+
+        # 弹窗式的操作配置框
+        dbc.Modal([
+            dbc.ModalHeader(dbc.ModalTitle("待配置", id="operation-modal-title", className="fw-bold text-primary")),
+            dbc.ModalBody(id="operation-modal-body", children=[
+                html.P("请先从工具箱选择一个操作以开始设置", className="text-muted small")
+            ]),
+            dbc.ModalFooter([
+                dbc.Button("取消", id="btn-modal-cancel", color="secondary", size="sm", className="me-2"),
+                dbc.Button("应用", id="btn-modal-apply", color="primary", size="sm"),
+            ])
+        ], id="operation-modal", is_open=False, backdrop="static"),
 
         # 下载组件
         dcc.Download(id='download-code'),
@@ -207,65 +228,148 @@ def layout():
         html.Div(id='preview-stats-display', style={'display': 'none'}),
         html.Div(id='apply-dataset-status', style={'display': 'none'}),
 
-    ], fluid=True, className="py-4")
+        # 内联代码折叠兼容
+        html.Div(id='inline-code-collapse', style={'display': 'none'}),
+        html.Div(id='inline-code-collapse-icon', style={'display': 'none'}),
+        html.Div(id='btn-toggle-inline-code', style={'display': 'none'}),
+
+    ], style={"padding": "12px 16px"})
 
 
-# ============================================================================
-# 操作配置模态框
-# ============================================================================
-
-def _create_operation_modal():
-    """创建通用操作配置模态框"""
-    return dbc.Modal([
-        dbc.ModalHeader(dbc.ModalTitle(id="operation-modal-title", children="操作配置")),
-        dbc.ModalBody(id="operation-modal-body", children=[]),
-        dbc.ModalFooter([
-            dbc.Button("取消", id="btn-modal-cancel", color="secondary", className="me-2"),
-            dbc.Button("应用", id="btn-modal-apply", color="primary"),
-        ]),
-    ], id="operation-modal", is_open=False, size="lg")
+# _create_operation_modal 已弃用，配置表单直接注入左栏
 
 
 def _build_form_for_operation(op_type, columns):
     """根据操作类型构建配置表单"""
     col_options = [{'label': c, 'value': c} for c in columns]
 
+    # ── 辅助：在表单后追加所有缺失 State ID 的隐藏占位组件 ──
+    # apply_operation 回调显式声明了以下全部 ID 为 State，
+    # Dash 要求它们全部存在于 DOM 中。每个操作只生成部分表单字段，
+    # 此辅助函数会自动为缺失的 ID 追加隐藏的空组件。
+    ALL_STATE_IDS = {
+        'modal-param-column': lambda: dcc.Dropdown(id='modal-param-column', value=None, style={'display': 'none'}),
+        'modal-param-operator': lambda: dcc.Dropdown(id='modal-param-operator', value=None, style={'display': 'none'}),
+        'modal-param-value': lambda: dbc.Input(id='modal-param-value', value='', style={'display': 'none'}),
+        'modal-param-columns-multi': lambda: dcc.Dropdown(id='modal-param-columns-multi', value=[], style={'display': 'none'}),
+        'modal-param-new-name': lambda: dbc.Input(id='modal-param-new-name', value='', style={'display': 'none'}),
+        'modal-param-ascending': lambda: dcc.Dropdown(id='modal-param-ascending', value=None, style={'display': 'none'}),
+        'modal-param-target-type': lambda: dcc.Dropdown(id='modal-param-target-type', value=None, style={'display': 'none'}),
+        'modal-param-method': lambda: dcc.Dropdown(id='modal-param-method', value=None, style={'display': 'none'}),
+        'modal-param-fill-value': lambda: dbc.Input(id='modal-param-fill-value', value='', style={'display': 'none'}),
+        'modal-param-keep': lambda: dcc.Dropdown(id='modal-param-keep', value=None, style={'display': 'none'}),
+        'modal-param-delimiter': lambda: dbc.Input(id='modal-param-delimiter', value='', style={'display': 'none'}),
+        'modal-param-max-split': lambda: dbc.Input(id='modal-param-max-split', value=None, type='number', style={'display': 'none'}),
+        'modal-param-old-value': lambda: dbc.Input(id='modal-param-old-value', value='', style={'display': 'none'}),
+        'modal-param-new-value': lambda: dbc.Input(id='modal-param-new-value', value='', style={'display': 'none'}),
+        'modal-param-case-type': lambda: dcc.Dropdown(id='modal-param-case-type', value=None, style={'display': 'none'}),
+        'modal-param-pattern': lambda: dbc.Input(id='modal-param-pattern', value='', style={'display': 'none'}),
+        'modal-param-replacement': lambda: dbc.Input(id='modal-param-replacement', value='', style={'display': 'none'}),
+        'modal-param-is-regex': lambda: dbc.Checklist(id='modal-param-is-regex', value=[], style={'display': 'none'}),
+        'modal-param-start': lambda: dbc.Input(id='modal-param-start', value=None, type='number', style={'display': 'none'}),
+        'modal-param-end': lambda: dbc.Input(id='modal-param-end', value=None, type='number', style={'display': 'none'}),
+        'modal-param-bins': lambda: dbc.Input(id='modal-param-bins', value=None, type='number', style={'display': 'none'}),
+        'modal-param-bin-method': lambda: dcc.Dropdown(id='modal-param-bin-method', value=None, style={'display': 'none'}),
+        'modal-param-norm-method': lambda: dcc.Dropdown(id='modal-param-norm-method', value=None, style={'display': 'none'}),
+        'modal-param-how': lambda: dcc.Dropdown(id='modal-param-how', value=None, style={'display': 'none'}),
+        'modal-param-threshold': lambda: dbc.Input(id='modal-param-threshold', value=None, type='number', style={'display': 'none'}),
+        'modal-param-expression': lambda: dbc.Input(id='modal-param-expression', value='', style={'display': 'none'}),
+        'modal-filter-tabs': lambda: dbc.Tabs(id='modal-filter-tabs', active_tab=None, children=[], style={'display': 'none'}),
+        'modal-param-checklist': lambda: dbc.Checklist(id='modal-param-checklist', value=[], style={'display': 'none'}),
+    }
+
+    def _collect_ids(component):
+        """递归收集组件树中所有 id"""
+        ids = set()
+        if hasattr(component, 'id') and component.id:
+            ids.add(component.id)
+        if hasattr(component, 'children'):
+            kids = component.children
+            if isinstance(kids, list):
+                for child in kids:
+                    if hasattr(child, 'id') or hasattr(child, 'children'):
+                        ids |= _collect_ids(child)
+            elif hasattr(kids, 'id') or hasattr(kids, 'children'):
+                ids |= _collect_ids(kids)
+        return ids
+
+    def _wrap_with_placeholders(form_div):
+        """在表单后追加缺失 ID 的隐藏占位"""
+        used = _collect_ids(form_div)
+        missing = [create_fn() for sid, create_fn in ALL_STATE_IDS.items() if sid not in used]
+        if not missing:
+            return form_div
+        return _wrap_with_placeholders(html.Div([form_div, html.Div(missing, style={'display': 'none'})]))
+
     if op_type == 'filter':
-        return html.Div([
-            dbc.Row([
-                dbc.Col([
-                    html.Label("选择列", className="form-label"),
-                    dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择列"),
-                ], width=4),
-                dbc.Col([
-                    html.Label("运算符", className="form-label"),
-                    dcc.Dropdown(id='modal-param-operator', options=[
-                        {'label': '等于 (==)', 'value': '=='},
-                        {'label': '不等于 (!=)', 'value': '!='},
-                        {'label': '大于 (>)', 'value': '>'},
-                        {'label': '小于 (<)', 'value': '<'},
-                        {'label': '大于等于 (>=)', 'value': '>='},
-                        {'label': '小于等于 (<=)', 'value': '<='},
-                        {'label': '包含', 'value': 'contains'},
-                        {'label': '开头是', 'value': 'startswith'},
-                        {'label': '结尾是', 'value': 'endswith'},
-                    ], placeholder="选择运算符"),
-                ], width=4),
-                dbc.Col([
-                    html.Label("值", className="form-label"),
-                    dbc.Input(id='modal-param-value', type='text', placeholder="输入筛选值"),
-                ], width=4),
-            ]),
-        ])
+        return _wrap_with_placeholders(html.Div([
+            html.Label("1. 选择要筛选的列", className="form-label fw-bold"),
+            dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="请选择或输入列名", className="mb-3"),
+            
+            html.Div(id="modal-filter-options-container", style={"display": "none"}, children=[
+                html.Label("2. 设置筛选规则", className="form-label fw-bold mt-2"),
+                dbc.Tabs([
+                    dbc.Tab(label="条件筛选", tab_id="tab-condition", children=[
+                        dbc.Row([
+                            dbc.Col([
+                                html.Label("运算符", className="form-label text-muted mt-2"),
+                                dcc.Dropdown(id='modal-param-operator', options=[
+                                    {'label': '等于', 'value': '=='},
+                                    {'label': '不等于', 'value': '!='},
+                                    {'label': '大于', 'value': '>'},
+                                    {'label': '重大于等于', 'value': '>='},
+                                    {'label': '小于', 'value': '<'},
+                                    {'label': '小于等于', 'value': '<='},
+                                    {'label': '包含文本', 'value': 'contains'},
+                                    {'label': '不包含文本', 'value': 'not_contains'},
+                                    {'label': '开头是', 'value': 'startswith'},
+                                    {'label': '结尾是', 'value': 'endswith'},
+                                    {'label': '为空 (null)', 'value': 'isnull'},
+                                    {'label': '非空 (not null)', 'value': 'notnull'},
+                                ], placeholder="选择运算符", value='==', className="mb-2"),
+                            ], width=5),
+                            
+                            dbc.Col([
+                                html.Label("值", className="form-label text-muted mt-2"),
+                                dbc.Input(id='modal-param-value', type='text', placeholder="输入筛选值 (数字/文本)"),
+                            ], width=7),
+                        ])
+                    ], className="py-3"),
+                    
+                    dbc.Tab(label="列表勾选 (多选)", tab_id="tab-checklist", children=[
+                        html.Div([
+                            html.Div([
+                                dbc.Input(id="modal-filter-search", placeholder="在列表中搜索...", size="sm", className="mb-2"),
+                                dbc.Button("全选", id="btn-filter-select-all", size="sm", color="link", className="p-0 me-3 text-decoration-none"),
+                                dbc.Button("清空", id="btn-filter-clear-all", size="sm", color="link", className="p-0 text-decoration-none text-danger"),
+                            ], className="d-flex justify-content-between align-items-center mb-2 mt-2"),
+                            
+                            html.Div(
+                                id='modal-param-checklist-container',
+                                children=dcc.Checklist(
+                                    id='modal-param-checklist',
+                                    options=[],
+                                    value=[],
+                                    className="dvs-checklist",
+                                    labelClassName="d-block mb-1",
+                                    inputClassName="me-2"
+                                ),
+                                style={"maxHeight": "200px", "overflowY": "auto", "border": "1px solid var(--border)", "padding": "0.5rem", "borderRadius": "4px"}
+                            )
+                        ], className="py-2")
+                    ])
+                ], id="modal-filter-tabs", active_tab="tab-condition")
+            ])
+        ]))
 
     elif op_type == 'drop_column':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             html.Label("选择要删除的列（可多选）", className="form-label"),
             dcc.Dropdown(id='modal-param-columns-multi', options=col_options, multi=True, placeholder="选择列"),
-        ])
+        ]))
 
     elif op_type == 'rename_column':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -276,10 +380,10 @@ def _build_form_for_operation(op_type, columns):
                     dbc.Input(id='modal-param-new-name', type='text', placeholder="输入新列名"),
                 ], width=6),
             ]),
-        ])
+        ]))
 
     elif op_type == 'sort':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -293,10 +397,10 @@ def _build_form_for_operation(op_type, columns):
                     ], value='true', clearable=False),
                 ], width=6),
             ]),
-        ])
+        ]))
 
     elif op_type == 'type_conversion':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -313,10 +417,10 @@ def _build_form_for_operation(op_type, columns):
                     ], placeholder="选择目标类型"),
                 ], width=6),
             ]),
-        ])
+        ]))
 
     elif op_type == 'fill_missing':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -338,10 +442,10 @@ def _build_form_for_operation(op_type, columns):
                     dbc.Input(id='modal-param-fill-value', type='text', placeholder="输入固定值"),
                 ], width=4),
             ]),
-        ])
+        ]))
 
     elif op_type == 'drop_duplicates':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("子集列（可选，多选）", className="form-label"),
@@ -356,10 +460,10 @@ def _build_form_for_operation(op_type, columns):
                     ], value='first', clearable=False),
                 ], width=4),
             ]),
-        ])
+        ]))
 
     elif op_type == 'split_column':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -374,10 +478,10 @@ def _build_form_for_operation(op_type, columns):
                     dbc.Input(id='modal-param-max-split', type='number', value=-1, placeholder="-1为不限"),
                 ], width=4),
             ]),
-        ])
+        ]))
 
     elif op_type == 'merge_columns':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择要合并的列（多选）", className="form-label"),
@@ -393,10 +497,10 @@ def _build_form_for_operation(op_type, columns):
                     dbc.Input(id='modal-param-new-name', type='text', placeholder="输入新列名"),
                 ], width=4),
             ]),
-        ])
+        ]))
 
     elif op_type == 'replace_value':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -411,16 +515,16 @@ def _build_form_for_operation(op_type, columns):
                     dbc.Input(id='modal-param-new-value', type='text', placeholder="替换为"),
                 ], width=4),
             ]),
-        ])
+        ]))
 
     elif op_type == 'strip_whitespace':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             html.Label("选择列", className="form-label"),
             dcc.Dropdown(id='modal-param-column', options=col_options, placeholder="选择要去除空格的列"),
-        ])
+        ]))
 
     elif op_type == 'change_case':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -436,10 +540,10 @@ def _build_form_for_operation(op_type, columns):
                     ], placeholder="选择转换方式"),
                 ], width=6),
             ]),
-        ])
+        ]))
 
     elif op_type == 'find_replace_regex':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -461,10 +565,10 @@ def _build_form_for_operation(op_type, columns):
                     ], value='true', clearable=False),
                 ], width=3),
             ]),
-        ])
+        ]))
 
     elif op_type == 'extract_substring':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -484,10 +588,10 @@ def _build_form_for_operation(op_type, columns):
                 ], width=2),
             ]),
             html.Small("提示：填写正则模式时忽略位置参数；留空正则时使用位置切片", className="text-muted"),
-        ])
+        ]))
 
     elif op_type == 'bin_column':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列（数值型）", className="form-label"),
@@ -505,10 +609,10 @@ def _build_form_for_operation(op_type, columns):
                     ], value='equal_width', clearable=False),
                 ], width=4),
             ]),
-        ])
+        ]))
 
     elif op_type == 'normalize':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列（数值型）", className="form-label"),
@@ -523,10 +627,10 @@ def _build_form_for_operation(op_type, columns):
                     ], value='minmax', clearable=False),
                 ], width=6),
             ]),
-        ])
+        ]))
 
     elif op_type == 'drop_missing_rows':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("指定列（可选）", className="form-label"),
@@ -546,10 +650,10 @@ def _build_form_for_operation(op_type, columns):
                 ], width=4),
             ]),
             html.Small("提示：设置阈值时将忽略删除条件", className="text-muted"),
-        ])
+        ]))
 
     elif op_type == 'duplicate_column':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("选择列", className="form-label"),
@@ -560,10 +664,10 @@ def _build_form_for_operation(op_type, columns):
                     dbc.Input(id='modal-param-new-name', type='text', placeholder="输入新列名"),
                 ], width=6),
             ]),
-        ])
+        ]))
 
     elif op_type == 'create_calculated':
-        return html.Div([
+        return _wrap_with_placeholders(html.Div([
             dbc.Row([
                 dbc.Col([
                     html.Label("计算表达式", className="form-label"),
@@ -576,9 +680,9 @@ def _build_form_for_operation(op_type, columns):
                 ], width=4),
             ]),
             html.Small(f"可用列名: {', '.join(columns)}", className="text-muted d-block mt-2"),
-        ])
+        ]))
 
-    return html.Div("未知操作类型")
+    return _wrap_with_placeholders(html.Div("未知操作类型"))
 
 
 # ============================================================================
@@ -634,6 +738,7 @@ def load_data(n_clicks, dm_loaded):
     Output('operation-modal-title', 'children'),
     Output('operation-modal-body', 'children'),
     Output('pending-operation-type', 'data'),
+    Output('toolbox-offcanvas', 'is_open'),
     # 所有操作按钮作为 Input
     Input('btn-filter', 'n_clicks'),
     Input('btn-drop-column', 'n_clicks'),
@@ -654,24 +759,27 @@ def load_data(n_clicks, dm_loaded):
     Input('btn-drop-missing-rows', 'n_clicks'),
     Input('btn-duplicate-column', 'n_clicks'),
     Input('btn-create-calculated', 'n_clicks'),
-    Input('btn-modal-cancel', 'n_clicks'),
+    Input('btn-open-toolbox', 'n_clicks'),
     State('original-data-store', 'data'),
     State('preview-data-store', 'data'),
+    State('toolbox-offcanvas', 'is_open'),
     prevent_initial_call=True
 )
 def open_operation_modal(*args):
-    """点击操作按钮时弹出配置表单"""
     triggered_id = ctx.triggered_id
 
+    original_data = args[-3]
+    preview_data = args[-2]
+    toolbox_is_open = args[-1]
+
+    if triggered_id == 'btn-open-toolbox':
+        return False, dash.no_update, dash.no_update, dash.no_update, not toolbox_is_open
+
     if triggered_id == 'btn-modal-cancel':
-        return False, "", [], None
+        return False, dash.no_update, dash.no_update, None, False
 
     if triggered_id not in OPERATION_BUTTONS:
-        return no_update, no_update, no_update, no_update
-
-    # 获取原始数据中的列名
-    original_data = args[-2]  # State: original-data-store
-    preview_data = args[-1]   # State: preview-data-store
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     # 使用最新的预览数据，以便列名反映已执行的操作
     data_to_use = preview_data or original_data
@@ -680,12 +788,12 @@ def open_operation_modal(*args):
     if not columns:
         return True, "提示", html.Div([
             dbc.Alert("请先加载数据", color="warning"),
-        ]), None
+        ]), None, False
 
     op_type, op_name = OPERATION_BUTTONS[triggered_id]
     form = _build_form_for_operation(op_type, columns)
 
-    return True, f"配置 — {op_name}", form, op_type
+    return True, f"⚙️ {op_name}配置", form, op_type, False
 
 
 # ============================================================================
@@ -730,6 +838,8 @@ def open_operation_modal(*args):
     State('modal-param-how', 'value'),
     State('modal-param-threshold', 'value'),
     State('modal-param-expression', 'value'),
+    State('modal-filter-tabs', 'active_tab'),
+    State('modal-param-checklist', 'value'),
     prevent_initial_call=True
 )
 def apply_operation(
@@ -739,11 +849,11 @@ def apply_operation(
     delimiter, max_split, old_value, new_value,
     case_type, pattern, replacement, is_regex,
     start, end, bins, bin_method, norm_method,
-    how, threshold, expression
+    how, threshold, expression, filter_active_tab, filter_checklist
 ):
     """在用户填写参数后执行操作"""
     if not op_type or not original_data:
-        return no_update, no_update, no_update, no_update, no_update, no_update
+        return False, no_update, no_update, no_update, no_update, no_update
 
     # 根据操作类型构建参数
     params = _build_params(
@@ -752,11 +862,11 @@ def apply_operation(
         delimiter, max_split, old_value, new_value,
         case_type, pattern, replacement, is_regex,
         start, end, bins, bin_method, norm_method,
-        how, threshold, expression
+        how, threshold, expression, filter_active_tab, filter_checklist
     )
 
     if params is None:
-        return no_update, no_update, no_update, no_update, no_update, no_update
+        return False, no_update, no_update, no_update, no_update, no_update
 
     # 创建操作记录
     operation = {
@@ -775,7 +885,7 @@ def apply_operation(
     result = preview_engine.compute_preview(df, new_pipeline)
 
     if 'error' in result:
-        return no_update, no_update, no_update, no_update, no_update, no_update
+        return False, no_update, no_update, no_update, no_update, no_update
 
     operation['affected_rows'] = result.get('affected_rows', 0)
     operation['affected_cols'] = result.get('affected_cols', 0)
@@ -805,14 +915,28 @@ def _build_params(
     delimiter, max_split, old_value, new_value,
     case_type, pattern, replacement, is_regex,
     start, end, bins, bin_method, norm_method,
-    how, threshold, expression
+    how, threshold, expression, filter_active_tab=None, filter_checklist=None
 ):
     """根据操作类型从表单字段值构建参数字典"""
 
     if op_type == 'filter':
-        if not column or not operator:
+        if not column:
             return None
-        return {'column': column, 'operator': operator, 'value': value or ''}
+            
+        if filter_active_tab == 'tab-checklist':
+            # Checklist 模式：转换为 isin
+            if not filter_checklist:
+                # 没有任何勾选，等效于清空数据 (或者根据需求抛错)
+                return {'column': column, 'operator': 'isin', 'value': []}
+            return {'column': column, 'operator': 'isin', 'value': filter_checklist}
+        else:
+            # 基础 Condition 模式
+            if not operator:
+                return None
+            # 对于 isnull / notnull, 不需要 value
+            if operator in ['isnull', 'notnull']:
+                return {'column': column, 'operator': operator, 'value': ''}
+            return {'column': column, 'operator': operator, 'value': value or ''}
 
     elif op_type == 'drop_column':
         if not columns_multi:
@@ -1058,14 +1182,14 @@ def handle_undo_redo(undo_clicks, redo_clicks, original_data):
 # ============================================================================
 
 @callback(
-    Output('code-collapse', 'is_open'),
-    Output('code-collapse-icon', 'className'),
-    Input('btn-toggle-code', 'n_clicks'),
-    State('code-collapse', 'is_open'),
+    Output('inline-code-collapse', 'is_open'),
+    Output('inline-code-collapse-icon', 'className'),
+    Input('btn-toggle-inline-code', 'n_clicks'),
+    State('inline-code-collapse', 'is_open'),
     prevent_initial_call=True
 )
 def toggle_code_collapse(n_clicks, is_open):
-    """切换代码预览区的折叠状态"""
+    """切换侧边代码展示区的折叠状态"""
     new_state = not is_open
     icon_class = "bi bi-chevron-up" if new_state else "bi bi-chevron-down"
     return new_state, icon_class
@@ -1076,19 +1200,12 @@ def toggle_code_collapse(n_clicks, is_open):
 # ============================================================================
 
 @callback(
-    Output('code-preview-modal', 'is_open'),
-    Output('code-display-area', 'children'),
     Output('inline-code-display', 'children'),
-    Input('btn-view-code', 'n_clicks'),
-    Input('btn-close-code-modal', 'n_clicks'),
     Input('pipeline-store', 'data'),
-    State('code-preview-modal', 'is_open'),
     prevent_initial_call=False
 )
-def handle_code_preview(view_clicks, close_clicks, pipeline, is_open):
-    """处理代码预览 - 同时更新模态框和内联显示"""
-    triggered_id = ctx.triggered_id
-
+def handle_code_preview(pipeline):
+    """处理代码预览 - 并在时更新内联显示"""
     # 获取数据集名称
     dm = DataManager()
     dataset_name = dm.active_name if dm.active_name else "data.csv"
@@ -1106,7 +1223,7 @@ def handle_code_preview(view_clicks, close_clicks, pipeline, is_open):
 
     # 创建内联代码显示
     inline_display = html.Pre([
-        html.Code(code, style={
+        html.Code(code, className="language-python", style={
             "color": "var(--text-primary)",
             "fontSize": "0.875rem",
             "fontFamily": "monospace"
@@ -1119,13 +1236,105 @@ def handle_code_preview(view_clicks, close_clicks, pipeline, is_open):
         "overflowY": "auto"
     })
 
-    if triggered_id == 'btn-view-code':
-        from components.data_workshop.code_preview_panel import create_code_preview_panel
-        code_display = create_code_preview_panel(code, show_header=False)
-        return True, code_display, inline_display
+    return inline_display
 
-    elif triggered_id == 'btn-close-code-modal':
-        return False, no_update, inline_display
+# ============================================================================
+# 高级过滤联动配置回调 (Power Query Style)
+# ============================================================================
 
-    # 默认情况（pipeline 更新时）
-    return no_update, no_update, inline_display
+@callback(
+    [Output('modal-filter-options-container', 'style'),
+     Output('modal-param-checklist', 'options'),
+     Output('modal-param-checklist', 'value')],
+    [Input('modal-param-column', 'value'),
+     Input('modal-filter-search', 'value'),
+     Input('btn-filter-select-all', 'n_clicks'),
+     Input('btn-filter-clear-all', 'n_clicks')],
+    [State('original-data-store', 'data'),
+     State('pending-operation-type', 'data'),
+     State('modal-param-checklist', 'options')],
+    prevent_initial_call=True
+)
+def update_filter_options(column, search_term, select_all, clear_all, data, op_type, current_options):
+    if op_type != 'filter' or not data:
+        return {'display': 'none'}, [], []
+        
+    if not column:
+        return {'display': 'none'}, [], []
+        
+    ctx_id = dash.callback_context.triggered[0]['prop_id'].split('.')[0]
+    
+    # 无论怎么点，全选清空都只操作当前的 options
+    if ctx_id == 'btn-filter-select-all' and current_options:
+        return {'display': 'block'}, current_options, [opt['value'] for opt in current_options]
+        
+    if ctx_id == 'btn-filter-clear-all' and current_options:
+        return {'display': 'block'}, current_options, []
+        
+    try:
+        df = pd.read_json(data, orient='split')
+        if column not in df.columns:
+            return {'display': 'none'}, [], []
+            
+        # 提取高频唯一值 (取前 200 个防卡顿)
+        unique_vals = df[column].dropna().unique()
+        # 尽可能保证排序
+        try:
+             unique_vals = sorted(unique_vals)
+        except TypeError:
+             pass # 如果遇到混用的数据类型无法 sort，跳过
+        
+        unique_vals = list(unique_vals)[:200]
+        
+        # 搜索过滤
+        if search_term:
+            term = str(search_term).lower()
+            filtered_vals = [v for v in unique_vals if term in str(v).lower()]
+        else:
+            filtered_vals = unique_vals
+            
+        opts = [{'label': str(v), 'value': str(v)} for v in filtered_vals]
+        
+        # 搜索时不覆盖已勾选的 value 逻辑比较复杂，这里简单处理为搜出什么默认全都不选，需用户手动勾。
+        # 如果是首次加载列，默认全选。
+        if ctx_id == 'modal-param-column':
+            init_vals = [str(v) for v in filtered_vals]
+            return {'display': 'block'}, opts, init_vals
+             
+        return {'display': 'block'}, opts, dash.no_update
+        
+    except Exception as e:
+        print(f"Error fetching unique values: {e}")
+        return {'display': 'block'}, [], []
+
+
+# ============================================================================
+# 回调：左侧抽屉折叠/展开
+# ============================================================================
+
+@callback(
+    Output('left-drawer', 'style'),
+    Input('btn-toggle-left-drawer', 'n_clicks'),
+    State('left-drawer', 'style'),
+    prevent_initial_call=True
+)
+def toggle_left_drawer(n_clicks, current_style):
+    if not current_style:
+        current_style = {}
+    
+    # 复制字典避免直接修改引用
+    new_style = dict(current_style)
+    current_width = new_style.get("width", "280px")
+    
+    if current_width == "0px":
+        new_style["width"] = "300px"
+        new_style["opacity"] = "1"
+        new_style["borderWidth"] = "1px"
+        new_style["padding"] = "0"
+    else:
+        new_style["width"] = "0px"
+        new_style["opacity"] = "0"
+        new_style["borderWidth"] = "0px"
+        new_style["padding"] = "0"
+        
+    return new_style

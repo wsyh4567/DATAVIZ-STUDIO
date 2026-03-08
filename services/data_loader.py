@@ -107,21 +107,92 @@ def load_feather(file_content: bytes) -> pd.DataFrame:
     return pd.read_feather(io.BytesIO(file_content))
 
 
+def _optimize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+    """优化 DataFrame 的数据类型以减少内存使用。"""
+    for col in df.columns:
+        # 尝试转换为数值类型
+        if pd.api.types.is_numeric_dtype(df[col]):
+            if pd.api.types.is_integer_dtype(df[col]):
+                # 尝试转换为更小的整数类型
+                min_val = df[col].min()
+                max_val = df[col].max()
+                if min_val >= np.iinfo(np.int8).min and max_val <= np.iinfo(np.int8).max:
+                    df[col] = df[col].astype(np.int8)
+                elif min_val >= np.iinfo(np.int16).min and max_val <= np.iinfo(np.int16).max:
+                    df[col] = df[col].astype(np.int16)
+                elif min_val >= np.iinfo(np.int32).min and max_val <= np.iinfo(np.int32).max:
+                    df[col] = df[col].astype(np.int32)
+            # 浮点数可以考虑 downcast，但通常不显著且可能损失精度
+            # df[col] = pd.to_numeric(df[col], downcast='float')
+        # 尝试转换为日期时间类型
+        elif pd.api.types.is_string_dtype(df[col]):
+            try:
+                # 尝试转换为日期时间，errors='coerce' 会将无法解析的转换为 NaT
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+                # 如果转换后大部分是 NaT，则可能不是日期时间，恢复为字符串
+                if df[col].isnull().sum() > len(df) * 0.5:
+                    df[col] = df[col].astype(str)
+            except Exception:
+                pass # 保持为字符串
+        # 尝试转换为 Categorical 类型
+        if df[col].nunique() / len(df) < 0.5 and len(df[col]) > 50: # 阈值可调整
+            df[col] = df[col].astype('category')
+    return df
+
+
 def load_file(file_content: bytes, filename: str) -> pd.DataFrame:
-    """根据文件扩展名自动选择加载方式。"""
-    ext = Path(filename).suffix.lower()
-    if ext in (".csv", ".tsv"):
-        return load_csv(file_content, filename)
-    elif ext in (".xlsx", ".xls"):
-        return load_excel(file_content)
-    elif ext == ".json":
-        return load_json(file_content)
-    elif ext == ".parquet":
-        return load_parquet(file_content)
-    elif ext in (".feather", ".ftr"):
-        return load_feather(file_content)
-    else:
-        raise ValueError(f"不支持的文件格式：{ext}")
+    """支持 Excel, CSV, TSV, JSON, Parquet, Feather"""
+    try:
+        if filename.endswith('.csv'):
+            try:
+                # 首先尝试 utf-8
+                df = pd.read_csv(io.BytesIO(file_content), encoding='utf-8')
+            except UnicodeDecodeError:
+                # 失败则尝试 gbk/gb18030
+                df = pd.read_csv(io.BytesIO(file_content), encoding='gb18030')
+        elif filename.endswith('.tsv'):
+            df = pd.read_csv(io.BytesIO(file_content), sep='\t')
+        elif filename.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(io.BytesIO(file_content))
+        elif filename.endswith('.json'):
+            df = pd.read_json(io.BytesIO(file_content))
+        elif filename.endswith('.parquet'):
+            df = pd.read_parquet(io.BytesIO(file_content))
+        elif filename.endswith('.feather'):
+            df = pd.read_feather(io.BytesIO(file_content))
+        else:
+            raise ValueError(f"不受支持的文件格式: {filename}")
+        
+        # Optimize dtypes
+        df = _optimize_dtypes(df)
+        return df
+
+    except Exception as e:
+        logger.error(f"Failed to load file {filename}: {e}")
+        raise ValueError(f"无法加载文件 {filename}: {str(e)}")
+
+
+def load_from_database(connection_string: str, query: str) -> pd.DataFrame:
+    """
+    通过 SQLAlchemy 从数据库加载指定查询语句的结果。
+    适用于 MySQL, PostgreSQL, SQLite, SQL Server 等。
+    """
+    try:
+        import sqlalchemy
+        from sqlalchemy import create_engine
+    except ImportError:
+        raise ImportError("连接数据库需要安装 'sqlalchemy'。请执行 pip install sqlalchemy")
+
+    try:
+        engine = create_engine(connection_string)
+        with engine.connect() as conn:
+            df = pd.read_sql_query(query, conn)
+        
+        df = _optimize_dtypes(df)
+        return df
+    except Exception as e:
+        logger.error(f"Failed to load from database: {e}")
+        raise ValueError(f"无法从数据库加载数据: {str(e)}")
 
 
 # ── 内置示例数据集 ─────────────────────────────────────
@@ -139,6 +210,14 @@ SAMPLE_DATASETS: dict[str, dict] = {
         "label": "🚢 泰坦尼克 (Titanic)",
         "description": "乘客生存数据 — 891 行 × 12 列",
     },
+    "gapminder": {
+        "label": "🌍 国家经济 (Gapminder)",
+        "description": "全球经济发展数据 — 1704 行 × 6 列",
+    },
+    "stocks": {
+        "label": "科技股票 (Stocks)",
+        "description": "股票价格数据 — 504 行 × 7 列",
+    },
 }
 
 
@@ -150,6 +229,10 @@ def load_sample_dataset(name: str) -> pd.DataFrame:
         return _make_tips()
     elif name == "titanic":
         return _make_titanic()
+    elif name == "gapminder":
+        return _make_gapminder()
+    elif name == "stocks":
+        return _make_stocks()
     else:
         raise ValueError(f"未知示例数据集：{name}")
 
@@ -232,3 +315,84 @@ def _make_titanic() -> pd.DataFrame:
         "fare": fare,
         "embarked": embarked,
     })
+
+
+def _make_gapminder() -> pd.DataFrame:
+    """全球国家经济发展数据集"""
+    rng = np.random.RandomState(42)
+
+    countries = {
+        "China": ("Asia", 1300, 3000, 72),
+        "India": ("Asia", 1100, 1800, 65),
+        "United States": ("Americas", 300, 40000, 78),
+        "Indonesia": ("Asia", 230, 2500, 68),
+        "Brazil": ("Americas", 190, 8000, 72),
+        "Japan": ("Asia", 127, 35000, 82),
+        "Germany": ("Europe", 82, 38000, 80),
+        "United Kingdom": ("Europe", 62, 36000, 79),
+        "France": ("Europe", 64, 34000, 81),
+        "Nigeria": ("Africa", 160, 2000, 52),
+        "Egypt": ("Africa", 85, 5000, 70),
+        "South Africa": ("Africa", 50, 8000, 55),
+        "Mexico": ("Americas", 115, 9000, 75),
+        "Canada": ("Americas", 35, 42000, 81),
+        "Australia": ("Oceania", 22, 45000, 82),
+        "South Korea": ("Asia", 50, 28000, 79),
+        "Argentina": ("Americas", 42, 12000, 76),
+        "Kenya": ("Africa", 45, 1500, 60),
+    }
+
+    years = list(range(1952, 2008, 5))
+    rows = []
+
+    for country, (continent, base_pop, base_gdp, base_life) in countries.items():
+        for i, year in enumerate(years):
+            growth = 1 + i * 0.08 + rng.normal(0, 0.02)
+            pop = int(base_pop * (1 + i * 0.03) * 1_000_000 * (1 + rng.normal(0, 0.02)))
+            gdp = round(base_gdp * growth * (1 + rng.normal(0, 0.05)), 1)
+            life = round(base_life + i * 0.5 + rng.normal(0, 0.5), 1)
+            life = min(life, 85)
+            rows.append({
+                "country": country,
+                "continent": continent,
+                "year": year,
+                "lifeExp": life,
+                "pop": pop,
+                "gdpPercap": gdp,
+            })
+
+    return pd.DataFrame(rows)
+
+
+def _make_stocks() -> pd.DataFrame:
+    """科技公司股票数据集"""
+    rng = np.random.RandomState(7)
+
+    companies = {
+        "AAPL": 150, "GOOGL": 2800, "MSFT": 300,
+        "AMZN": 3300, "TSLA": 700, "META": 330, "NVDA": 220,
+    }
+
+    dates = pd.date_range("2023-01-01", periods=72, freq="W")
+    rows = []
+
+    for symbol, base_price in companies.items():
+        price = base_price
+        for date in dates:
+            change = rng.normal(0.001, 0.03)
+            price *= (1 + change)
+            volume = int(rng.uniform(5_000_000, 50_000_000))
+            high = price * (1 + abs(rng.normal(0, 0.015)))
+            low = price * (1 - abs(rng.normal(0, 0.015)))
+            rows.append({
+                "date": date,
+                "symbol": symbol,
+                "close": round(price, 2),
+                "open": round(price * (1 + rng.normal(0, 0.005)), 2),
+                "high": round(high, 2),
+                "low": round(low, 2),
+                "volume": volume,
+            })
+
+    return pd.DataFrame(rows)
+

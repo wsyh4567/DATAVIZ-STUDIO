@@ -1,0 +1,387 @@
+/* ═══════════════════════════════════════════════════════════
+   Dash Bootstrap Components (DBC) Overrides
+   Design System: Monarch Money (Light / Teal / Orange)
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 1. Form Controls (Input, Textarea, Select) ───────── */
+.form-control,
+.form-select {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+    font-size: var(--text-sm) !important;
+    border-radius: var(--radius-sm) !important;
+    transition: border-color var(--transition-fast) !important;
+}
+
+.form-control:hover,
+.form-select:hover {
+    border-color: var(--border-hover) !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(49, 151, 149, 0.2) !important;
+    outline: none !important;
+}
+
+.form-control::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.form-control:disabled,
+.form-control[readonly] {
+    background-color: var(--bg-secondary) !important;
+    opacity: 0.6 !important;
+}
+
+/* ── 2. Dash Core Components Select / Dropdown ────────── */
+.Select-control {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-sm) !important;
+    transition: border-color var(--transition-fast) !important;
+}
+
+.Select-control:hover {
+    border-color: var(--border-hover) !important;
+    box-shadow: none !important;
+}
+
+.is-focused:not(.is-open)>.Select-control {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(49, 151, 149, 0.2) !important;
+}
+
+.Select.is-open>.Select-control {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--accent-primary) !important;
+}
+
+/* 占位符和选中值 */
+.Select-placeholder,
+.Select-value-label {
+    color: var(--text-primary) !important;
+}
+
+.Select-placeholder {
+    color: var(--text-muted) !important;
+}
+
+/* 下拉菜单 */
+.Select-menu-outer {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    box-shadow: var(--shadow-md) !important;
+    margin-top: 4px !important;
+}
+
+.Select-option {
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
+    padding: 6px 12px !important;
+    cursor: pointer !important;
+}
+
+.Select-option:hover,
+.Select-option.is-focused {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+.Select-option.is-selected {
+    background-color: var(--accent-light) !important;
+    color: var(--accent-primary) !important;
+}
+
+/* 清除按钮和下拉箭头 */
+.Select-clear-zone {
+    color: var(--text-muted) !important;
+}
+
+.Select-clear-zone:hover {
+    color: var(--text-primary) !important;
+}
+
+.Select-arrow {
+    border-color: var(--text-muted) transparent transparent !important;
+}
+
+/* ── 3. Modals ───────────────────────────────────────── */
+.modal-content {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border) !important;
+    padding: var(--sp-4) var(--sp-6) !important;
+}
+
+.modal-title {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    font-size: var(--text-lg) !important;
+}
+
+.modal-body {
+    padding: var(--sp-6) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border) !important;
+    padding: var(--sp-4) var(--sp-6) !important;
+}
+
+/* 关闭按钮 */
+.btn-close {
+    opacity: 0.5 !important;
+}
+
+.btn-close:hover {
+    opacity: 1 !important;
+}
+
+/* ── 4. Cards ────────────────────────────────────────── */
+.card {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.card-header {
+    background-color: transparent !important;
+    border-bottom: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+}
+
+.card-footer {
+    background-color: transparent !important;
+    border-top: 1px solid var(--border) !important;
+}
+
+.card-title {
+    color: var(--text-primary) !important;
+}
+
+.card-text {
+    color: var(--text-secondary) !important;
+}
+
+/* ── 5. Tables ───────────────────────────────────────── */
+.table {
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+}
+
+.table th,
+.table td {
+    border-bottom-color: var(--border) !important;
+    padding: var(--sp-2) var(--sp-3) !important;
+}
+
+.table th {
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+    background-color: var(--bg-tertiary) !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+.table tbody tr:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(0, 0, 0, 0.02) !important;
+}
+
+/* ── 6. Buttons ──────────────────────────────────────── */
+.btn-outline-primary {
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+    background-color: var(--bg-tertiary) !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--bg-hover) !important;
+    border-color: var(--border-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+.btn-outline-secondary {
+    color: var(--text-secondary) !important;
+    border-color: var(--border) !important;
+    background-color: transparent !important;
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+/* ── 7. Alerts ───────────────────────────────────────── */
+.alert {
+    border: 1px solid transparent !important;
+    border-radius: var(--radius-md) !important;
+}
+
+.alert-primary,
+.alert-info {
+    background-color: rgba(49, 151, 149, 0.1) !important;
+    color: var(--accent-primary) !important;
+    border-color: rgba(49, 151, 149, 0.2) !important;
+}
+
+.alert-success {
+    background-color: rgba(34, 197, 94, 0.1) !important;
+    color: var(--success) !important;
+    border-color: rgba(34, 197, 94, 0.2) !important;
+}
+
+.alert-warning {
+    background-color: rgba(234, 179, 8, 0.1) !important;
+    color: var(--warning) !important;
+    border-color: rgba(234, 179, 8, 0.2) !important;
+}
+
+.alert-danger {
+    background-color: rgba(239, 68, 68, 0.1) !important;
+    color: var(--error) !important;
+    border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+/* ── 8. Navigation (Navs, Tabs) ──────────────────────── */
+.nav-pills .nav-link {
+    color: var(--text-secondary) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 6px 16px !important;
+    transition: background-color var(--transition-fast) !important;
+}
+
+.nav-pills .nav-link:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--bg-active) !important;
+    color: var(--text-primary) !important;
+    font-weight: 500 !important;
+}
+
+.nav-tabs {
+    border-bottom: 1px solid var(--border) !important;
+}
+
+.nav-tabs .nav-link {
+    color: var(--text-secondary) !important;
+    border: 1px solid transparent !important;
+    border-top-left-radius: var(--radius-sm) !important;
+    border-top-right-radius: var(--radius-sm) !important;
+}
+
+.nav-tabs .nav-link:hover,
+.nav-tabs .nav-link:focus {
+    border-color: transparent transparent var(--border) !important;
+    isolation: isolate !important;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--text-primary) !important;
+    background-color: transparent !important;
+    border-color: transparent transparent var(--accent-primary) !important;
+    border-bottom-width: 2px !important;
+}
+
+/* ── 9. Toast ────────────────────────────────────────── */
+.toast {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--shadow-md) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+.toast-header {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+.toast-body {
+    color: var(--text-secondary) !important;
+}
+
+/* ── 10. Accordion ───────────────────────────────────── */
+.accordion-item {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+}
+
+.accordion-button {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    box-shadow: inset 0 -1px 0 var(--border) !important;
+}
+
+
+
+.accordion-body {
+    color: var(--text-secondary) !important;
+}
+
+/* ── 11. Checkbox & Radio ────────────────────────────── */
+.form-check-input {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border) !important;
+}
+
+.form-check-input:checked {
+    background-color: var(--accent-primary) !important;
+    border-color: var(--accent-primary) !important;
+}
+
+.form-check-input:focus {
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(49, 151, 149, 0.2) !important;
+    border-color: var(--accent-primary) !important;
+}
+
+/* ── 12. Range Slider ────────────────────────────────── */
+input[type=range]::-webkit-slider-runnable-track {
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border);
+    height: 6px;
+    border-radius: 3px;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    background: var(--accent-primary) !important;
+    border: 2px solid var(--bg-primary);
+    box-shadow: 0 0 0 1px var(--border);
+}
+
+/* ── 13. Badges ──────────────────────────────────────── */
+.badge.bg-primary {
+    background-color: var(--accent-light) !important;
+    color: var(--accent-primary) !important;
+    border: 1px solid rgba(49, 151, 149, 0.2);
+}
+
+.badge.bg-secondary {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}

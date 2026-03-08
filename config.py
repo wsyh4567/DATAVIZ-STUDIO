@@ -34,11 +34,12 @@ DEFAULT_THEME: Final[str] = "dark"
 
 # ── 导航 ─────────────────────────────────────────────
 NAV_ITEMS: Final[list[dict]] = [
-    {"icon": "📊", "label": "数据画布", "href": "/canvas"},
-    {"icon": "📁", "label": "数据中心", "href": "/data"},
-    {"icon": "🧹", "label": "数据工坊", "href": "/workshop"},
-    {"icon": "📈", "label": "图表工作室", "href": "/charts"},
-    {"icon": "🧮", "label": "统计实验室", "href": "/stats"},
-    {"icon": "📋", "label": "仪表盘", "href": "/dashboard"},
-    {"icon": "⚡", "label": "高级工具", "href": "/advanced"},
+    {"icon": "bi bi-house", "label": "主页", "href": "/home"},
+    {"icon": "bi bi-server", "label": "数据中心", "href": "/data"},
+    {"icon": "bi bi-grid-1x2", "label": "数据画布", "href": "/canvas"},
+    {"icon": "bi bi-hammer", "label": "数据工坊", "href": "/workshop"},
+    {"icon": "bi bi-graph-up", "label": "图表工作室", "href": "/charts"},
+    {"icon": "bi bi-calculator", "label": "统计实验室", "href": "/stats"},
+    {"icon": "bi bi-robot", "label": "机器学习", "href": "/ml"},
+    {"icon": "bi bi-lightning", "label": "高级工具", "href": "/advanced"},
 ]

@@ -1,0 +1,9 @@
+D:\python\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.3.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.1) doesn't match a supported version!
+  warnings.warn(
+Traceback (most recent call last):
+  File "C:\Users\Toxic\Desktop\python\python项目DataViz Studio\app.py", line 36, in <module>
+    import pages.statistics_lab
+  File "C:\Users\Toxic\Desktop\python\python项目DataViz Studio\pages\statistics_lab.py", line 58
+    ], className="page-container")
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: keyword argument repeated: className

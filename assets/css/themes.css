@@ -1,73 +1,10 @@
 /* ═══════════════════════════════════════════════════════════
-   DataViz Studio — Themes
-   Light theme overrides (dark is default in base.css)
+   DataViz Studio — Themes (v2 · 2026)
    ═══════════════════════════════════════════════════════════ */
 
-[data-theme="light"] {
-    /* Background */
-    --bg-primary: #F8FAFC;
-    --bg-secondary: #FFFFFF;
-    --bg-tertiary: #F1F5F9;
-    --bg-hover: #E2E8F0;
-    --bg-active: #CBD5E1;
+/* ── Themes 已被 base.css 接管，此处已清空遗留的 light theme 覆盖 ── */
 
-    /* Accent (keep the same Indigo) */
-    --accent: #4F46E5;
-    --accent-hover: #6366F1;
-    --accent-light: rgba(79, 70, 229, 0.08);
-    --accent-glow: rgba(79, 70, 229, 0.15);
-    --accent-primary: #4F46E5;
-    --accent-secondary: #6366F1;
-
-    /* Text */
-    --text-primary: #0F172A;
-    --text-secondary: #475569;
-    --text-muted: #94A3B8;
-
-    /* Semantic */
-    --success: #059669;
-    --success-light: rgba(5, 150, 105, 0.1);
-    --warning: #D97706;
-    --warning-light: rgba(217, 119, 6, 0.1);
-    --error: #DC2626;
-    --error-light: rgba(220, 38, 38, 0.1);
-    --info: #2563EB;
-    --info-light: rgba(37, 99, 235, 0.1);
-
-    /* Border */
-    --border: #E2E8F0;
-    --border-hover: #CBD5E1;
-    --border-glow: rgba(79, 70, 229, 0.2);
-    --border-glow-hover: rgba(79, 70, 229, 0.4);
-
-    /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-    --shadow-glow: 0 0 20px var(--accent-glow);
-
-    /* Glass effect for light theme */
-    --glass-bg: rgba(255, 255, 255, 0.8);
-    --glass-bg-strong: rgba(255, 255, 255, 0.95);
-    --glass-blur: 12px;
-    --glass-blur-strong: 16px;
-}
-
-/* Light theme scrollbar */
-[data-theme="light"] ::-webkit-scrollbar-thumb {
-    background: var(--border);
-}
-
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-    background: var(--border-hover);
-}
-
-
-/* ═══════════════════════════════════════════════════════════
-   Dash DataTable Styling
-   ═══════════════════════════════════════════════════════════ */
-
-/* Dark theme DataTable */
+/* ── Dash DataTable Dark ────────────────────────────── */
 .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner table {
     color: var(--text-primary) !important;
 }
@@ -88,70 +25,22 @@
     background-color: var(--bg-hover) !important;
 }
 
-/* Light theme DataTable */
-[data-theme="light"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td,
-[data-theme="light"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
-    color: var(--text-primary) !important;
-    background-color: var(--bg-secondary) !important;
-    border-color: var(--border) !important;
-}
-
-[data-theme="light"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
-    background-color: var(--bg-tertiary) !important;
-}
-
-[data-theme="light"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tr:hover td {
-    background-color: var(--bg-hover) !important;
-}
-
-
-/* ═══════════════════════════════════════════════════════════
-   Glassmorphism Design Pattern
-   玻璃拟态效果 - 科技感视觉核心
-   ═══════════════════════════════════════════════════════════ */
-
-/* ── Base Glassmorphism Class ────────────────────────── */
+/* ── Glassmorphism ──────────────────────────────────── */
 .dvs-glass {
     background: var(--glass-bg);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-glow-md);
-    transition: all var(--transition-slow);
+    transition: border-color var(--transition-base);
 }
 
 .dvs-glass:hover {
-    border-color: var(--border-glow-hover);
-    box-shadow: var(--shadow-glow-lg);
+    border-color: var(--border-hover);
 }
 
-/* ── Glassmorphism Fallback (不支持backdrop-filter) ── */
 @supports not (backdrop-filter: blur(12px)) {
     .dvs-glass {
-        background: rgba(15, 23, 42, 0.95);
+        background: var(--bg-secondary);
     }
-}
-
-/* ── Glassmorphism Variants ──────────────────────────── */
-.dvs-glass--subtle {
-    background: rgba(15, 23, 42, 0.5);
-    border-color: rgba(14, 165, 233, 0.2);
-    box-shadow: var(--shadow-glow-sm);
-}
-
-.dvs-glass--strong {
-    background: rgba(15, 23, 42, 0.85);
-    border-color: rgba(14, 165, 233, 0.4);
-    box-shadow: var(--shadow-glow-lg);
-}
-
-.dvs-glass--accent {
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
-}
-
-.dvs-glass--accent:hover {
-    border-color: var(--accent-hover);
-    box-shadow: 0 0 25px rgba(14, 165, 233, 0.4);
 }

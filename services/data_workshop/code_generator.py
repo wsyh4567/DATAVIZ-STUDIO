@@ -128,9 +128,30 @@ print(f"数据形状: {{df.shape}}")"""
         operator = params.get('operator', '==')
         value = params.get('value', '')
         
-        # 处理字符串值
+        # 处理布尔值和不需要值的操作符
+        if operator in ['isnull', 'notnull']:
+            return f"df = df[df['{column}'].{operator}()]\nprint(f'筛选后行数: {{len(df)}}')"
+            
+        if operator == 'isin':
+            if not isinstance(value, list):
+                value = [value]
+            return f"df = df[df['{column}'].astype(str).isin({repr(value)})]\nprint(f'筛选后行数: {{len(df)}}')"
+            
+        if operator == 'contains':
+            return f"df = df[df['{column}'].astype(str).str.contains({repr(value)}, case=True, na=False)]\nprint(f'筛选后行数: {{len(df)}}')"
+            
+        if operator == 'not_contains':
+            return f"df = df[~df['{column}'].astype(str).str.contains({repr(value)}, case=True, na=False)]\nprint(f'筛选后行数: {{len(df)}}')"
+            
+        if operator == 'startswith':
+            return f"df = df[df['{column}'].astype(str).str.startswith({repr(value)}, na=False)]\nprint(f'筛选后行数: {{len(df)}}')"
+            
+        if operator == 'endswith':
+            return f"df = df[df['{column}'].astype(str).str.endswith({repr(value)}, na=False)]\nprint(f'筛选后行数: {{len(df)}}')"
+
+        # 处理常规值
         if isinstance(value, str):
-            value_str = f"'{value}'"
+            value_str = f"{repr(value)}"
         else:
             value_str = str(value)
         

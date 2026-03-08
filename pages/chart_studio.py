@@ -8,10 +8,11 @@
 from __future__ import annotations
 
 import dash_bootstrap_components as dbc
-from dash import html, dcc, callback, Input, Output, State, no_update
+from dash import html, dcc, callback, Input, Output, State, no_update, ctx, MATCH, ALL
 import pandas as pd
 import json
 import io
+import requests
 import plotly.graph_objects as go
 
 from core.data_manager import DataManager
@@ -19,6 +20,7 @@ from components.code_preview import create_code_preview_panel
 from services.chart_service import ChartService, ChartLibrary, ChartType, PLOTLY_CHART_TYPES, SEABORN_CHART_TYPES
 from services.code_generator import CodeGenerator
 from services.field_analyzer import get_labeled_options
+from services.chart_recommender import ChartRecommender
 
 
 def create_chart_studio_page() -> html.Div:
@@ -41,26 +43,48 @@ def create_chart_studio_page() -> html.Div:
     return html.Div([
         # 顶部：图表库切换器
         html.Div([
-            html.Label("图表库：", className="me-2"),
-            dcc.RadioItems(
+            html.Label("图表引擎：", className="me-3 fw-bold"),
+            dbc.RadioItems(
                 id='chart-library-selector',
                 options=[
-                    {'label': ' 📊 Plotly（交互式）', 'value': 'plotly'},
-                    {'label': ' 📈 Seaborn（静态美化）', 'value': 'seaborn'}
+                    {'label': '📊 Plotly (交互式)', 'value': 'plotly'},
+                    {'label': '🎨 Seaborn (静态制图)', 'value': 'seaborn'}
                 ],
                 value='plotly',
-                inline=True,
-                className='library-selector',
-                labelStyle={'marginRight': '20px'}
+                className='btn-group',
+                inputClassName='btn-check',
+                labelClassName='btn btn-outline-primary',
+                labelCheckedClassName='active btn-primary',
+                labelCheckedStyle={"backgroundColor": "var(--primary)", "color": "white", "borderColor": "var(--primary)", "fontWeight": "600"},
             ),
             html.Div(id='library-info', className='library-info text-muted ms-3')
-        ], className='library-switcher p-3 bg-secondary border-bottom fade-in'),
+        ], className='library-switcher p-3 border-bottom fade-in d-flex align-items-center'),
 
-        # 主内容区
-        dbc.Row([
+        # 主模块 Tabs
+        dbc.Tabs([
+            dbc.Tab(label="✨ 图表探索", tab_id="tab-explore", children=[
+                # 原主内容区
+                dbc.Row([
             # 左侧：参数配置面板
             dbc.Col([
                 html.Div([
+                    # 智能推荐区域
+                    html.Div(
+                        id='chart-recommend-area',
+                        children=[
+                            html.Div([
+                                html.Span("📌", className="me-1"),
+                                html.Span("智能推荐", style={"fontWeight": "600", "fontSize": "0.85rem"}),
+                            ], className="mb-2", style={"color": "var(--accent)"}),
+                            html.Div(
+                                "选择 X/Y 轴后将显示推荐图表",
+                                id='chart-recommendations',
+                                style={"fontSize": "0.8rem", "color": "var(--text-muted)"},
+                            ),
+                        ],
+                        className='mb-3 p-2 dvs-alert dvs-alert--info'
+                    ),
+
                     html.H6("图表类型", className="mb-3"),
                     dcc.Dropdown(
                         id='chart-type-selector',
@@ -79,7 +103,7 @@ def create_chart_studio_page() -> html.Div:
                     ),
 
                 ], className='p-3 slide-in-left')
-            ], width=3, className='bg-secondary border-end', style={'height': 'calc(100vh - 140px)', 'overflowY': 'auto'}),
+            ], width=3, className='border-end', style={'height': 'calc(100vh - 140px)', 'overflowY': 'auto'}),
 
             # 中间：图表画布
             dbc.Col([
@@ -91,7 +115,7 @@ def create_chart_studio_page() -> html.Div:
                                    className='placeholder-text mt-3')
                         ], className='chart-placeholder text-center',
                            style={'paddingTop': '100px'})
-                    ], className='fade-in', style={'height': '60%', 'borderBottom': '1px solid #333'}),
+                    ], className='fade-in', style={'height': '60%', 'borderBottom': '1px solid var(--border)'}),
 
                     # 导出按钮行
                     html.Div([
@@ -104,7 +128,13 @@ def create_chart_studio_page() -> html.Div:
                         dbc.Button([
                             html.I(className="bi bi-filetype-html me-1"), "导出HTML"
                         ], id='export-html-btn', color='outline-success', size='sm', className='btn-hover'),
-                    ], className='d-flex p-2 border-bottom', style={'backgroundColor': 'var(--bg-secondary)'}),
+                        
+                        html.Div(style={"flex": "1"}),
+                        
+                        dbc.Button([
+                            html.I(className="bi bi-bookmark-heart me-1"), "保存至画廊"
+                        ], id='btn-save-chart', color='warning', size='sm', className='btn-hover shadow-sm', style={"color": "#fff"}),
+                    ], className='d-flex align-items-center p-2 border-bottom'),
 
                     # 代码预览面板
                     create_code_preview_panel(),
@@ -112,24 +142,106 @@ def create_chart_studio_page() -> html.Div:
                 ], className='p-3')
             ], width=9, style={'height': 'calc(100vh - 140px)', 'overflowY': 'auto'}),
 
-        ], className='g-0'),
+        ], className='g-0')
+            ]), # 结束 Tab 1
+
+            dbc.Tab(label="🖼️ 图表画廊", tab_id="tab-gallery", children=[
+                html.Div([
+                    html.Div([
+                        html.H5("已保存的图表模型", className="mb-0"),
+                        dbc.Button([
+                            html.I(className="bi bi-trash me-2"), "清空画廊"
+                        ], id="btn-clear-gallery", color="danger", outline=True, size="sm")
+                    ], className="d-flex justify-content-between align-items-center mb-4"),
+                    html.Div(id="chart-gallery-grid")
+                ], className="p-4", style={'height': 'calc(100vh - 140px)', 'overflowY': 'auto'})
+            ]), # 结束 Tab 2
+
+            dbc.Tab(label="🧠 图表分析", tab_id="tab-analysis", children=[
+                dbc.Row([
+                    # 左侧：当前图表快照
+                    dbc.Col([
+                        html.H6([html.I(className="bi bi-image me-2"), "当前图表快照"], className="mb-3", style={"color": "var(--text-muted)"}),
+                        dbc.Card(
+                            dbc.CardBody([
+                                html.Div(id="ai-chart-display", className="d-flex align-items-center justify-content-center w-100 h-100 text-muted", children="分析区会同步你最后生成的图表...")
+                            ]),
+                            style={"height": "100%", "backgroundColor": "var(--bg-secondary)", "border": "1px dashed var(--border)"}
+                        )
+                    ], width=5, className="p-4 border-end", style={"height": "calc(100vh - 140px)"}),
+
+                    # 右侧：AI 配置与输出
+                    dbc.Col([
+                        # API 配置折叠面板
+                        dbc.Accordion([
+                            dbc.AccordionItem([
+                                dbc.Row([
+                                    dbc.Col([
+                                        html.Label("API 协议地址 (Base URL)", className="form-label small"),
+                                        dbc.Input(id="ai-api-base", value="https://api.openai.com/v1", size="sm")
+                                    ], width=6),
+                                    dbc.Col([
+                                        html.Label("模型名称 (Model)", className="form-label small"),
+                                        dbc.Input(id="ai-api-model", value="gpt-3.5-turbo", size="sm")
+                                    ], width=6)
+                                ], className="mb-2"),
+                                dbc.Row([
+                                    dbc.Col([
+                                        html.Label("API 密钥 (API Key)", className="form-label small"),
+                                        dbc.Input(id="ai-api-key", type="password", placeholder="sk-...", size="sm")
+                                    ], width=12)
+                                ])
+                            ], title="⚙️ AI 引擎配置 (支持兼容 OpenAI 接口的大模型)", item_id="api-config")
+                        ], start_collapsed=True, className="mb-4 shadow-sm"),
+
+                        # 操作与提示
+                        html.Div([
+                            dbc.Button([html.I(className="bi bi-magic me-2"), "生成深度分析结论"], id="btn-generate-ai", color="primary", className="flex-grow-1 shadow-sm rounded-pill"),
+                        ], className="d-flex w-100 mb-4"),
+
+                        # 输出区域
+                        html.H6("💡 AI 洞察结果", className="mb-2", style={"fontWeight": "600"}),
+                        dbc.Card(
+                            dbc.CardBody([
+                                dcc.Loading(
+                                    type="dot", color="#FF6B35",
+                                    children=dcc.Markdown(id="ai-analysis-output", className="markdown-body p-2", children="* 填写配置并点击「生成深度分析结论」开始解读... *")
+                                )
+                            ]),
+                            style={"height": "calc(100% - 240px)", "overflowY": "auto", "backgroundColor": "#F8FAFC"}
+                        )
+                    ], width=7, className="p-4", style={"height": "calc(100vh - 140px)"})
+                ], className="g-0")
+            ]), # 结束 Tab 3
+        ], id="chart-studio-tabs", active_tab="tab-explore", className="mt-2 px-3"),
 
         # 存储组件
         dcc.Store(id='chart-data-store'),
         dcc.Store(id='chart-figure-store'),
+        dcc.Store(id='saved-charts-store', storage_type='local', data=[]),  # 画廊本地存储
         dcc.Download(id='download-chart-file'),
 
         # Toast 提示
-        dbc.Toast(
-            "代码已复制到剪贴板",
-            id="copy-success-toast",
-            header="成功",
-            is_open=False,
-            dismissable=True,
-            icon="success",
-            duration=2000,
-            style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999},
-        ),
+        html.Div([
+            dbc.Toast(
+                "代码已复制到剪贴板",
+                id="copy-success-toast",
+                header="成功",
+                is_open=False,
+                dismissable=True,
+                icon="success",
+                duration=2000,
+            ),
+            dbc.Toast(
+                "图表已成功保存至画廊！",
+                id="save-success-toast",
+                header="保存成功",
+                is_open=False,
+                dismissable=True,
+                icon="success",
+                duration=3000,
+            )
+        ], style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999, "display": "flex", "flexDirection": "column", "gap": "10px"}),
 
     ], id='chart-studio-page')
 
@@ -158,13 +270,11 @@ def _create_style_panel() -> html.Div:
             dcc.Dropdown(
                 id='style-template',
                 options=[
-                    {'label': '暗色主题', 'value': 'plotly_dark'},
-                    {'label': '白色主题', 'value': 'plotly_white'},
-                    {'label': 'ggplot2', 'value': 'ggplot2'},
-                    {'label': 'seaborn', 'value': 'seaborn'},
-                    {'label': '简洁白', 'value': 'simple_white'},
+                    {'label': '明亮主题', 'value': 'plotly_white'},
+                    {'label': '极简无边界', 'value': 'simple_white'},
+                    {'label': '暗黑主题', 'value': 'plotly_dark'}
                 ],
-                value='plotly_dark',
+                value='plotly_white',
                 clearable=False,
                 className='mb-2'
             ),
@@ -212,6 +322,21 @@ def _create_style_panel() -> html.Div:
             ),
         ]),
 
+        # 启动辅助 Y 轴 (已被移至特征参数面板)
+
+        # 透明度
+        html.Div([
+            html.Label("不透明度 (Opacity)", className="form-label"),
+            dbc.Input(
+                id='style-opacity',
+                type='number',
+                min=0.1, max=1.0, step=0.1,
+                value=1.0,
+                size='sm',
+                className='mb-2'
+            ),
+        ]),
+
         # 尺寸
         dbc.Row([
             dbc.Col([
@@ -254,7 +379,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 placeholder='选择X轴字段',
                 className='mb-2'
             ),
-        ]),
+        ], id='wrapper-param-x'),
 
         html.Div([
             html.Label("y (Y轴)", className="form-label"),
@@ -264,7 +389,34 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 placeholder='选择Y轴字段',
                 className='mb-2'
             ),
-        ]),
+            dbc.Checkbox(
+                id='param-secondary-y-check',
+                label='启用双 Y 轴',
+                value=False,
+                className='mb-1 mt-2',
+                style={'fontSize': '12px', 'color': 'var(--text-muted)'}
+            ),
+            html.Div(id='wrap-secondary-y-col', style={'display': 'none'}, children=[
+                dcc.Dropdown(
+                    id='param-secondary-y-col',
+                    options=columns,
+                    placeholder='选择额外 Y 轴列',
+                    className='mb-2',
+                    clearable=True
+                )
+            ])
+        ], id='wrapper-param-y'),
+
+        html.Div([
+            html.Label("z (Z轴/限3D场景)", className="form-label"),
+            dcc.Dropdown(
+                id='param-z',
+                options=columns,
+                placeholder='选择Z轴字段',
+                clearable=True,
+                className='mb-2'
+            ),
+        ], id='wrapper-param-z', style={'display': 'none'}),
 
         html.Div([
             html.Label("color (颜色分组)", className="form-label"),
@@ -275,7 +427,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 clearable=True,
                 className='mb-2'
             ),
-        ]),
+        ], id='wrapper-param-color'),
 
         html.Div([
             html.Label("size (大小)", className="form-label"),
@@ -286,7 +438,18 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 clearable=True,
                 className='mb-2'
             ),
-        ]),
+        ], id='wrapper-param-size'),
+
+        html.Div([
+            html.Label("text (数据标签)", className="form-label"),
+            dcc.Dropdown(
+                id='param-text',
+                options=columns,
+                placeholder='选择图形上的悬停/常显文本',
+                clearable=True,
+                className='mb-2'
+            ),
+        ], id='wrapper-param-text'),
 
         # 高级参数（可折叠）
         html.Hr(),
@@ -310,7 +473,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                     multi=True,
                     className='mb-2'
                 ),
-            ]),
+            ], id='wrapper-param-hover-data'),
 
             html.Div([
                 html.Label("facet_row (分面行)", className="form-label"),
@@ -321,7 +484,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                     clearable=True,
                     className='mb-2'
                 ),
-            ]),
+            ], id='wrapper-param-facet-row'),
 
             html.Div([
                 html.Label("facet_col (分面列)", className="form-label"),
@@ -332,7 +495,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                     clearable=True,
                     className='mb-2'
                 ),
-            ]),
+            ], id='wrapper-param-facet-col'),
 
             html.Div([
                 html.Label("animation_frame (动画帧)", className="form-label"),
@@ -343,7 +506,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                     clearable=True,
                     className='mb-2'
                 ),
-            ]),
+            ], id='wrapper-param-animation-frame'),
 
             html.Div([
                 html.Label("trendline (趋势线)", className="form-label"),
@@ -357,7 +520,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                     clearable=True,
                     className='mb-2'
                 ),
-            ]),
+            ], id='wrapper-param-trendline'),
 
             html.Div([
                 html.Label("marginal_x (X轴边际图)", className="form-label"),
@@ -372,7 +535,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                     clearable=True,
                     className='mb-2'
                 ),
-            ]),
+            ], id='wrapper-param-marginal-x'),
 
             html.Div([
                 html.Label("marginal_y (Y轴边际图)", className="form-label"),
@@ -387,9 +550,15 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                     clearable=True,
                     className='mb-2'
                 ),
-            ]),
+            ], id='wrapper-param-marginal-y'),
 
         ], id='advanced-params-collapse', is_open=False),
+
+        # ── 隐藏占位符：generate_chart 回调 Input 需要这些 ID 存在 ──
+        html.Div([
+            dcc.Dropdown(id='param-palette', value=None),
+            dcc.Dropdown(id='param-style', value=None),
+        ], style={'display': 'none'}),
 
         # 图表样式
         _create_style_panel(),
@@ -423,12 +592,28 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
                 placeholder='选择Y轴字段',
                 className='mb-2'
             ),
+            dbc.Checkbox(
+                id='param-secondary-y-check',
+                label='启用辅助 Y 轴 (双Y坐标轴)',
+                value=False,
+                className='mb-1 mt-2',
+                style={'fontSize': '12px', 'color': 'var(--text-muted)'}
+            ),
+            html.Div(id='wrap-secondary-y-col', style={'display': 'none'}, children=[
+                dcc.Dropdown(
+                    id='param-secondary-y-col',
+                    options=columns,
+                    placeholder='选择额外的数值字段...',
+                    className='mb-2',
+                    clearable=True
+                )
+            ])
         ]),
 
         html.Div([
             html.Label("hue (颜色分组)", className="form-label"),
             dcc.Dropdown(
-                id='param-hue',
+                id='param-color',  # 统一为 param-color，与 Plotly 面板及 generate_chart 回调 Input 保持一致
                 options=columns,
                 placeholder='选择颜色字段（可选）',
                 clearable=True,
@@ -480,11 +665,36 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
             ),
         ]),
 
+        # ── 隐藏占位符：generate_chart 回调 Input 需要这些 ID 存在 ──
+        # 当切换到 Seaborn 模式时，Plotly 专用的参数组件不存在，
+        # 但 Dash 回调机制要求所有 Input 组件必须在 DOM 中，
+        # 否则回调会静默失败。以下隐藏 Dropdown 确保 ID 可达。
+        html.Div([
+            dcc.Dropdown(id='param-z', value=None),
+            dcc.Dropdown(id='param-text', value=None),
+            dcc.Dropdown(id='param-hover-data', value=None),
+            dcc.Dropdown(id='param-facet-row', value=None),
+            dcc.Dropdown(id='param-facet-col', value=None),
+            dcc.Dropdown(id='param-animation-frame', value=None),
+            dcc.Dropdown(id='param-trendline', value=None),
+            dcc.Dropdown(id='param-marginal-x', value=None),
+            dcc.Dropdown(id='param-marginal-y', value=None),
+        ], style={'display': 'none'}),
+
         # 图表样式
         _create_style_panel(),
 
     ], className='params-panel')
 
+@callback(
+    Output('wrap-secondary-y-col', 'style'),
+    Input('param-secondary-y-check', 'value'),
+    prevent_initial_call=True
+)
+def toggle_secondary_y(is_checked):
+    if is_checked:
+        return {'display': 'block', 'animation': 'fadeIn 0.3s ease-in-out'}
+    return {'display': 'none'}
 
 # ============================================================================
 # 回调函数
@@ -511,7 +721,7 @@ def switch_library(library):
             category = info['category']
             if category not in categories:
                 categories[category] = []
-            categories[category].append({'label': f"{info['name']} [{category}]", 'value': chart_type})
+            categories[category].append({'label': f"{info['name']} [{category}]", 'value': chart_type.value if hasattr(chart_type, 'value') else chart_type})
 
         for category, items in categories.items():
             options.extend(items)
@@ -521,7 +731,7 @@ def switch_library(library):
     else:
         options = []
         for chart_type, info_item in SEABORN_CHART_TYPES.items():
-            options.append({'label': f"{info_item['name']} [{info_item['category']}]", 'value': chart_type})
+            options.append({'label': f"{info_item['name']} [{info_item['category']}]", 'value': chart_type.value if hasattr(chart_type, 'value') else chart_type})
 
         params_panel = create_seaborn_params_panel(df)
         info = "Seaborn：静态图表，更美观的默认样式，适合出版和报告"
@@ -543,19 +753,20 @@ def toggle_advanced_params(n_clicks, is_open):
 @callback(
     [Output('param-y', 'options'),
      Output('param-color', 'options'),
-     Output('param-size', 'options')],
+     Output('param-size', 'options'),
+     Output('chart-recommendations', 'children')],
     [Input('param-x', 'value'),
      Input('param-y', 'value'),
      Input('param-color', 'value')],
     prevent_initial_call=False
 )
 def validate_params(x_val, y_val, color_val):
-    """校验参数，避免重复选择"""
+    """校验参数，避免重复选择 + 更新图表推荐"""
     dm = DataManager()
     df = dm.active_df
 
     if df is None or df.empty:
-        return [], [], []
+        return [], [], [], "请先加载数据"
 
     all_columns = get_labeled_options(df)
 
@@ -563,7 +774,86 @@ def validate_params(x_val, y_val, color_val):
     color_options = [opt for opt in all_columns if opt['value'] not in [x_val, y_val]]
     size_options = [opt for opt in all_columns if opt['value'] not in [x_val, y_val, color_val]]
 
-    return y_options, color_options, size_options
+    # 智能图表推荐
+    if x_val or y_val:
+        recs = ChartRecommender.recommend(df, x=x_val, y=y_val, color=color_val)
+        if recs:
+            rec_cards = []
+            for rec in recs:
+                rec_cards.append(
+                    html.Div([
+                        html.Div([
+                            html.I(className=f"{rec.icon} me-2", style={"fontSize": "1.2rem", "color": "var(--text-muted)", "marginBottom": "2px"}),
+                            html.Span(rec.name, className="ms-1",
+                                      style={"fontWeight": "600", "fontSize": "0.85rem", "pointerEvents": "none"}),
+                            html.Span(f" {rec.score}分",
+                                      style={"fontSize": "0.7rem", "color": "var(--success)",
+                                             "marginLeft": "auto", "pointerEvents": "none"}),
+                        ], className="d-flex align-items-center", style={"pointerEvents": "none"}),
+                    ],
+                        className='p-2 mb-1 filter-condition-card filter-group-card',
+                        id={'type': 'rec-card', 'index': rec.chart_type},
+                        n_clicks=0,
+                        style={"cursor": "pointer"}
+                    )
+                )
+            recommend_content = html.Div(rec_cards)
+        else:
+            recommend_content = "暂无推荐，请尝试选择不同的字段"
+    else:
+        recommend_content = "选择 X/Y 轴后将显示推荐图表"
+
+    return y_options, color_options, size_options, recommend_content
+
+
+def _parse_chart_error(e: Exception, library: str, chart_type: str) -> tuple[str, str, str]:
+    """解析图表生成错误并返回友好的提示信息。返回 (错误类型, 错误详情, 解决建议)"""
+    err_str = str(e).lower()
+    
+    # 针对各图表类型的参数要求说明
+    chart_reqs = {
+        "scatter": "散点图：X 和 Y 建议为数值型或时间型，【点大小 (Size) 必须是纯数值型】，【颜色 (Color)】可以是数值或分类。",
+        "line": "折线图：X 轴通常为时间或连续序列，Y 轴【必须是数值型】。",
+        "bar": "柱状图：X 轴(或Y轴)为分类标签，另一轴【必须是数值型】统计算法。",
+        "pie": "饼图：【数值 (Values/Hover)】必须是纯数值型，名称/颜色建议为分类文本。",
+        "sunburst": "旭日图：路径(层级)为分类文本，数值(Size/Values)【必须是纯数值型】。",
+        "treemap": "树状图：同旭日图，层级结构要求分类，【数值块大小必须是数值】。",
+        "heatmap": "热力图：X 和 Y 通常为分类标签构成网格，【Z 轴或计算值 (Values) 必须是纯数值型】。",
+        "box": "箱线图：通常分配一个分类轴和一个【数值轴】用来计算分位数。",
+        "violin": "小提琴图：【必须包含至少一个数值轴】用来计算核密度分布。",
+        "histogram": "直方图：X 或 Y 轴【必须是连续的数值型】，用于分箱统计频率。"
+    }
+    
+    req_hint = chart_reqs.get(chart_type, f"当前图表 ({chart_type}) 要求明确的维度和度量区分，通常颜色/大小/Z轴严格需要数值。")
+
+    # Plotly 常见错误
+    if library == 'plotly':
+        if "string column" in err_str and "size" in err_str:
+            return "参数类型冲突 (Size)", str(e), f"❌ 错误定位：您把包含文字（字符串）的列放在了【点大小 Size】中。\n📊 逻辑规范：{req_hint}"
+        if "string column" in err_str and "y" in err_str:
+             return "参数类型冲突 (Y轴)", str(e), f"❌ 错误定位：当前图表的 Y 轴不允许传入分类(文本)列，需要连续的数值。\n📊 逻辑规范：{req_hint}"
+        if "not numeric" in err_str:
+            return "需要数值型数据 (Numeric Required)", str(e), f"❌ 错误定位：向要求算术计算的字段传了非数值列（通常发生在大小、Z轴或数值指标上）。\n📊 逻辑规范：{req_hint}"
+        if "all arguments should have the same length" in err_str:
+             return "数组长度不匹配", str(e), "❌ 错误定位：输入特征之间存在空缺对不齐，请尝试在数据工坊先\"删除包含缺失值的行\"。"
+        
+    # Seaborn 常见错误
+    if library == 'seaborn':
+        if "could not convert string to float" in err_str:
+            return "强制类型转换失败 (String->Float)", "有不可转为数字的文本参与了绘图", f"❌ 错误定位：你可能把分类/文字列强行塞进了只接受连续数值的参数槽（比如热力图的运算区）。\n📊 逻辑规范：{req_hint}"
+        if "categorical" in err_str and "size" in err_str:
+            return "参数映射异常 (Size)", str(e), f"❌ 错误定位：Seaborn 不支持用非数值分类的文本来决定点的大小。\n📊 逻辑规范：{req_hint}"
+        if "no numeric data to plot" in err_str:
+            return "找不到有效的数值参与制图", str(e), f"❌ 错误定位：没有捕捉到可以用作计算边界或热力的数字序列。你可能只选中了文本列。\n📊 逻辑规范：{req_hint}"
+        if "cannot use `hue` without `x` and `y`" in err_str:
+            return "缺少基础坐标轴", str(e), "❌ 错误定位：你分配了颜色分类 (Hue)，但丢失了基本的 X 或 Y 映射。"
+        
+    # 通用错误
+    if "keyerror" in err_str or "not in index" in err_str:
+        return "所选字段已丢失或不存在", str(e), "❌ 错误定位：该列在原始数据中找不到。可能在预处理阶段被重命名或删除了，建议刷新字段下拉框重新选择。"
+        
+    # 默认回退
+    return "组合图表所需参数不符合引擎限制", str(e), f"❌ 错误定位：未命中已知规则，推测为核心数值/分类参数被错位放置。\n📊 图表规范参考：{req_hint}\n👉 请重新核实 X、Y、Color、Size 各坑位的选中状态。"
 
 
 @callback(
@@ -573,8 +863,10 @@ def validate_params(x_val, y_val, color_val):
     [Input('chart-type-selector', 'value'),
      Input('param-x', 'value'),
      Input('param-y', 'value'),
+     Input('param-z', 'value'),
      Input('param-color', 'value'),
      Input('param-size', 'value'),
+     Input('param-text', 'value'),
      Input('param-hover-data', 'value'),
      Input('param-facet-row', 'value'),
      Input('param-facet-col', 'value'),
@@ -582,22 +874,29 @@ def validate_params(x_val, y_val, color_val):
      Input('param-trendline', 'value'),
      Input('param-marginal-x', 'value'),
      Input('param-marginal-y', 'value'),
+     Input('param-palette', 'value'),
+     Input('param-style', 'value'),
      Input('style-title', 'value'),
      Input('style-template', 'value'),
      Input('style-color-scale', 'value'),
      Input('style-show-legend', 'value'),
      Input('style-show-grid', 'value'),
+     Input('param-secondary-y-check', 'value'),
+     Input('param-secondary-y-col', 'value'),
+     Input('style-opacity', 'value'),
      Input('style-width', 'value'),
      Input('style-height', 'value')],
     [State('chart-library-selector', 'value')],
     prevent_initial_call=True
 )
 def generate_chart(
-    chart_type, x, y, color, size, hover_data,
+    chart_type, x, y, z, color, size, text, hover_data,
     facet_row, facet_col, animation_frame,
     trendline, marginal_x, marginal_y,
+    param_palette, param_style,
     style_title, style_template, style_color_scale,
     style_show_legend, style_show_grid,
+    param_secondary_y_check, param_secondary_y_col, style_opacity,
     style_width, style_height,
     library
 ):
@@ -616,8 +915,10 @@ def generate_chart(
         params = {
             'x': x,
             'y': y,
+            'z': z,
             'color': color,
             'size': size,
+            'text': text,
             'hover_data': hover_data,
             'facet_row': facet_row,
             'facet_col': facet_col,
@@ -627,10 +928,12 @@ def generate_chart(
             'marginal_y': marginal_y,
             # 样式参数
             'title': style_title,
-            'template': style_template or 'plotly_dark',
+            'template': style_template or 'plotly_white',
             'color_scale': style_color_scale if style_color_scale else None,
             'show_legend': style_show_legend if style_show_legend is not None else True,
             'show_grid': style_show_grid if style_show_grid is not None else True,
+            'secondary_y': param_secondary_y_col if param_secondary_y_check else None,
+            'opacity': style_opacity,
             'width': style_width,
             'height': style_height,
         }
@@ -640,10 +943,16 @@ def generate_chart(
             'y': y,
             'hue': color,
             'size': size,
+            'style': param_style,
+            'palette': param_palette or 'deep',
             'title': style_title,
             'show_grid': style_show_grid if style_show_grid is not None else True,
+            'show_legend': style_show_legend if style_show_legend is not None else True,
+            'secondary_y': param_secondary_y_col if param_secondary_y_check else None,
             'width': style_width or 800,
             'height': style_height or 480,
+            'template': style_template,
+            'color_scale': style_color_scale,
         }
 
     # 移除 None 值
@@ -690,8 +999,20 @@ def generate_chart(
             return chart_component, code, None
 
     except Exception as e:
-        error_msg = f"生成图表时出错: {str(e)}"
-        return html.Div(error_msg, className='text-danger'), f"# {error_msg}", None
+        err_title, err_detail, err_suggestion = _parse_chart_error(e, library, chart_type)
+        
+        error_ui = dbc.Alert(
+            [
+                html.H6([html.I(className="bi bi-exclamation-triangle-fill me-2"), err_title], className="alert-heading text-danger"),
+                html.P(err_detail, className="mb-2 text-muted", style={"fontSize": "0.85rem", "wordBreak": "break-all"}),
+                html.Hr(className="my-2"),
+                html.P([html.B("💡 修复建议：", className="text-secondary"), err_suggestion], className="mb-0")
+            ],
+            color="light",
+            className="shadow-sm border-start border-danger border-4",
+            style={"maxWidth": "80%", "margin": "0 auto", "marginTop": "10%"}
+        )
+        return error_ui, f"# {err_title}: {err_detail}\n# 修复建议: {err_suggestion}", None
 
 
 @callback(
@@ -788,3 +1109,261 @@ clientside_callback(
     State('generated-code-display', 'value'),
     prevent_initial_call=True
 )
+
+@callback(
+    [Output('wrapper-param-z', 'style'),
+     Output('wrapper-param-size', 'style'),
+     Output('wrapper-param-text', 'style')],
+    Input('chart-type-selector', 'value'),
+    prevent_initial_call=False
+)
+def toggle_param_visibility_plotly(chart_type):
+    """根据图表类别隐藏不用填写的字段，让UI变得整洁清爽"""
+    show = {'display': 'block'}
+    hide = {'display': 'none'}
+    
+    # 比如仅3D散点和曲面能用 Z 轴
+    z_style = show if chart_type in ('scatter_3d', 'surface_3d') else hide
+    
+    # 折线、直方图、瀑布等无 Size 需要
+    size_style = hide if chart_type in ('bar', 'hbar', 'histogram', 'box', 'violin', 'area', 'waterfall', 'pie', 'sunburst', 'treemap', 'funnel', 'contour', 'surface_3d') else show
+    
+    # 文本支持情况
+    text_style = hide if chart_type in ('histogram', 'box', 'violin', 'density_heatmap', 'contour', 'surface_3d', 'sunburst', 'treemap', 'parallel', 'parallel_cat', 'splom') else show
+    
+    return z_style, size_style, text_style
+
+@callback(
+    Output('chart-type-selector', 'value'),
+    Input({'type': 'rec-card', 'index': ALL}, 'n_clicks'),
+    prevent_initial_call=True
+)
+def handle_recommendation_click(n_clicks_list):
+    """支持点击图表推荐小卡片后快速切换主图型"""
+    if not ctx.triggered:
+        return no_update
+    
+    trigger_prop = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    try:
+        trigger_dict = json.loads(trigger_prop)
+        t_type = trigger_dict.get('type')
+        chart_selected = trigger_dict.get('index')
+        
+        if t_type == 'rec-card' and chart_selected:
+            # 如果对应的卡片 n_clicks > 0 才切换
+            triggered_value = ctx.triggered[0]['value']
+            if triggered_value and triggered_value > 0:
+                return chart_selected
+    except Exception:
+        pass
+        
+    return no_update
+
+
+# ============================================================================
+# 画廊保存与渲染回调
+# ============================================================================
+
+@callback(
+    Output('saved-charts-store', 'data'),
+    Output('save-success-toast', 'is_open'),
+    Input('btn-save-chart', 'n_clicks'),
+    Input('btn-clear-gallery', 'n_clicks'),
+    State('chart-figure-store', 'data'),
+    State('chart-library-selector', 'value'),
+    State('chart-type-selector', 'value'),
+    State('saved-charts-store', 'data'),
+    prevent_initial_call=True
+)
+def handle_gallery_actions(save_clicks, clear_clicks, fig_data, library, chart_type, saved_data):
+    """处理图表保存与清空画廊逻辑"""
+    ctx_id = ctx.triggered_id
+    if not saved_data:
+        saved_data = []
+
+    if ctx_id == 'btn-clear-gallery':
+        return [], False
+
+    if ctx_id == 'btn-save-chart':
+        if not fig_data:
+            return no_update, False
+
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        new_item = {
+            'id': f"chart_{int(datetime.datetime.now().timestamp())}",
+            'timestamp': timestamp,
+            'library': library,
+            'chart_type': chart_type,
+            'figure': fig_data
+        }
+        
+        new_saved_data = list(saved_data)
+        new_saved_data.insert(0, new_item)
+        
+        return new_saved_data, True
+
+    return no_update, no_update
+
+
+@callback(
+    Output('chart-gallery-grid', 'children'),
+    Input('saved-charts-store', 'data')
+)
+def update_gallery(saved_data):
+    """读取本地存储并在画廊 Tab 中渲染图表网格"""
+    if not saved_data:
+        return html.Div([
+            html.I(className="bi bi-images", style={"fontSize": "4rem", "color": "var(--text-muted)"}),
+            html.P("画廊是空的", className="text-muted mt-3", style={"fontSize": "1.1rem"}),
+            html.P("在「图表探索」中制作图表并点击“保存至画廊”", className="text-muted", style={"fontSize": "0.875rem"}),
+        ], className="text-center", style={"paddingTop": "15vh"})
+
+    cards = []
+    for item in saved_data:
+        library = item.get('library', 'unknown')
+        fig_data = item.get('figure', {})
+        chart_type = item.get('chart_type', 'Chart')
+        chart_title = f"{str(chart_type).capitalize()} 图表"
+
+        if library == 'plotly' and 'plotly' in fig_data:
+            chart_content = dcc.Graph(
+                figure=fig_data['plotly'], 
+                config={'displayModeBar': False}, 
+                style={"height": "220px", "width": "100%"}
+            )
+        elif library == 'seaborn' and 'seaborn' in fig_data:
+            chart_content = html.Img(
+                src=fig_data['seaborn'], 
+                style={"maxWidth": "100%", "maxHeight": "220px", "objectFit": "contain"}
+            )
+        else:
+            chart_content = html.Div("无法预览", className="text-muted")
+
+        card = dbc.Card([
+            dbc.CardBody([
+                html.Div(chart_content, className="d-flex justify-content-center align-items-center mb-3", 
+                         style={"height": "220px", "backgroundColor": "white", "borderRadius": "4px", "overflow": "hidden", "padding": "4px"}),
+                html.H6(f"{chart_title}", className="card-title text-truncate", style={"fontSize": "0.95rem", "fontWeight": "bold"}),
+                html.Div([
+                    dbc.Badge(library.capitalize(), color="primary" if library == "plotly" else "info", className="me-2"),
+                    html.Small(item.get('timestamp', ''), className="text-muted")
+                ], className="d-flex justify-content-between align-items-center mt-2")
+            ], className="p-3")
+        ], className="h-100 shadow-sm", style={"border": "1px solid var(--border)", "backgroundColor": "var(--bg-secondary)"})
+
+        cards.append(dbc.Col(card, xs=12, sm=6, md=6, lg=4, xl=3, className="mb-4"))
+
+    return dbc.Row(cards)
+
+
+
+# ── AI 分析图表快照 ─────────────────────────────────────
+@callback(
+    Output("ai-chart-display", "children"),
+    Input("chart-figure-store", "data"),
+    Input("chart-data-store", "data"),
+)
+def update_ai_chart_snapshot(fig_data, config_data):
+    if not fig_data or not config_data:
+        return html.Div("暂无图表数据，请先生成图表", className="text-muted")
+        
+    lib = config_data.get('library')
+    if lib == 'plotly':
+        return dcc.Graph(figure=fig_data, config={'displayModeBar': False}, style={"width": "100%", "height": "100%"})
+    elif lib == 'seaborn':
+        return html.Img(src=fig_data, style={'maxWidth': '100%', 'maxHeight': '100%', 'objectFit': 'contain'})
+        
+    return html.Div("不支持的图表格式", className="text-danger")
+
+
+# ── AI 分析生成结论 ─────────────────────────────────────
+@callback(
+    Output("ai-analysis-output", "children"),
+    Input("btn-generate-ai", "n_clicks"),
+    State("ai-api-base", "value"),
+    State("ai-api-key", "value"),
+    State("ai-api-model", "value"),
+    State("chart-data-store", "data"),
+    prevent_initial_call=True
+)
+def generate_ai_analysis(n_clicks, api_base, api_key, model, chart_data):
+    if not n_clicks:
+        return no_update
+    if not api_key:
+        return "⚠️ 请先在配置中填入 API Key。"
+    if not chart_data:
+        return "⚠️ 当前没有生成图表，请先在「图表探索」中生成一张图表。"
+
+    try:
+        dm = DataManager()
+        df = dm.active_df
+        if df is None:
+            return "⚠️ 数据未加载。"
+            
+        summary = {
+            "Rows": len(df),
+            "Columns": len(df.columns),
+            "Missing_Values": df.isnull().sum().to_dict(),
+        }
+        
+        # 提取图表配置
+        chart_type = chart_data.get("chart_type", "未知")
+        params = chart_data.get("params", {})
+        
+        prompt = f"""
+你是一位资深的数据分析专家和商业顾问。请基于以下数据集的概况信息和刚刚生成的图表配置，给出专业且有深度的业务洞察。
+
+数据集概况：
+{json.dumps(summary, ensure_ascii=False, indent=2)}
+
+当前绘制的图表要素：
+- 图表类型：{chart_type}
+- 参数配置：{json.dumps(params, ensure_ascii=False, indent=2)}
+
+请按照以下结构输出你的分析结论：
+1. 【图表结构说明】：概括图表配置展现出的主要维度和可能呈现的规律。
+2. 【异常发现在哪】：推测在此类特征组合下，可能存在的极值、离群点现象，并指导我如何从图中鉴别。
+3. 【潜在业务洞察】：结合一般商业逻辑思维，解释该特征组合背后的潜在因果或关联。
+4. 【后续行动建议】：给出 1-2 条落地的后续数据分析探索方向。
+
+注意：使用严谨的 Markdown 格式，不要输出任何对话客套话，直接给出专业分析。
+"""
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a helpful and professional data analyzer."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7
+        }
+        
+        url = f"{api_base.rstrip('/')}/chat/completions"
+        resp = requests.post(url, headers=headers, json=payload, timeout=40)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        else:
+            return f"❌ API 请求失败 (状态码 {resp.status_code}): \n```json\n{resp.text}\n```"
+            
+    except Exception as e:
+        return f"❌ 请求或解析过程中发生异常：\n```\n{str(e)}\n```"
+
+# ── AI 分析保存报告 ─────────────────────────────────────
+@callback(
+    Output("download-chart-file", "data", allow_duplicate=True),
+    Input("btn-save-ai", "n_clicks"),
+    State("ai-analysis-output", "children"),
+    prevent_initial_call=True
+)
+def download_ai_report(n_clicks, ai_content):
+    if not n_clicks or not ai_content:
+        return no_update
+    return dcc.send_string(ai_content, "图表智能分析报告.md")

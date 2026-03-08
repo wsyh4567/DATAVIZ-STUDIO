@@ -17,7 +17,7 @@ def create_sidebar() -> html.Div:
                 className="dvs-sidebar__item",
                 href=item["href"],
                 children=[
-                    html.Span(item["icon"], className="dvs-sidebar__icon"),
+                    html.I(className=f"{item['icon']} dvs-sidebar__icon"),
                     html.Span(item["label"], className="dvs-sidebar__label"),
                 ],
             )
@@ -27,12 +27,23 @@ def create_sidebar() -> html.Div:
         id="sidebar",
         className="dvs-sidebar",
         children=[
+            # ── Brand ──
+            html.Div(
+                className="dvs-topbar__brand",
+                style={"padding": "0 16px", "marginBottom": "24px", "marginTop": "8px"},
+                children=[
+                    html.I(className="bi bi-bar-chart-fill dvs-topbar__brand-icon"),
+                    html.Span("DataViz "),
+                    html.Span("Studio", className="dvs-topbar__brand-accent"),
+                ],
+            ),
+            # Navigation Items
             *nav_items,
             # Toggle button at bottom
             html.Div(
                 id="sidebar-toggle",
                 className="dvs-sidebar__toggle",
-                children=[html.Span("◀", id="sidebar-toggle-icon")],
+                children=[html.I(className="bi bi-chevron-bar-left", id="sidebar-toggle-icon")],
             ),
         ],
     )

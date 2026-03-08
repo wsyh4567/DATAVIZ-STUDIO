@@ -6,7 +6,7 @@ window.dash_clientside.sidebar = {
             try {
                 const saved = sessionStorage.getItem('sidebar-collapsed');
                 if (saved === 'true') {
-                    return ['dvs-sidebar dvs-sidebar--collapsed', '▶'];
+                    return ['dvs-sidebar dvs-sidebar--collapsed', 'bi bi-chevron-bar-right'];
                 }
             } catch (e) {
                 console.warn('SessionStorage unavailable:', e);
@@ -16,7 +16,7 @@ window.dash_clientside.sidebar = {
 
         const collapsed = (current_class || '').includes('dvs-sidebar--collapsed');
         const newClass = collapsed ? 'dvs-sidebar' : 'dvs-sidebar dvs-sidebar--collapsed';
-        const newIcon = collapsed ? '◀' : '▶';
+        const newIcon = collapsed ? 'bi bi-chevron-bar-left' : 'bi bi-chevron-bar-right';
 
         try {
             sessionStorage.setItem('sidebar-collapsed', (!collapsed).toString());

@@ -89,7 +89,7 @@ def create_empty_code_panel() -> html.Div:
                 html.P("暂无代码", className="text-muted mt-3", style={"fontSize": "0.875rem"}),
                 html.P("执行操作后将自动生成Python代码", 
                       style={"color": "var(--text-muted)", "fontSize": "0.75rem"}),
-            ], className="text-center py-4")
+            ], className="text-center py-4", id="code-display-area")
         ], style={"padding": "1rem"})
     ], style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
 

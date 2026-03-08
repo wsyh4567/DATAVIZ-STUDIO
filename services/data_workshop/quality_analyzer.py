@@ -276,7 +276,7 @@ th {{ background: #f1f5f9; font-weight: 600; }}
 </style>
 </head>
 <body>
-<h1>📊 数据质量报告</h1>
+<h1>数据质量报告</h1>
 <p style="color:#94a3b8;">生成时间: {timestamp}</p>
 
 <h2>总体概况</h2>

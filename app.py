@@ -13,6 +13,11 @@ os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 import dash
 from dash import Dash, html, dcc, Input, Output, State, callback, no_update
 import dash_bootstrap_components as dbc
+try:
+    import psutil
+    _HAS_PSUTIL = True
+except ImportError:
+    _HAS_PSUTIL = False
 
 import config
 from core.state_manager import get_initial_state
@@ -23,20 +28,20 @@ from components.statusbar import create_statusbar
 from utils.helpers import format_number
 
 # Import page modules to register their callbacks
-import pages.welcome
+import pages.home
 import pages.data_hub
 import pages.data_canvas
 import pages.chart_studio
 import pages.data_workshop
 import pages.statistics_lab
-import pages.dashboard
 import pages.advanced
+import pages.ml_studio
 
 # ── 初始化 Dash 应用 ──────────────────────────────────
 
 app = Dash(
     __name__,
-    external_stylesheets=[dbc.themes.BOOTSTRAP],
+    external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
     suppress_callback_exceptions=True,
     title=config.APP_NAME,
     update_title=None,
@@ -90,15 +95,20 @@ def route_page(pathname: str):
             return pages.data_workshop.layout()
         elif pathname == "/stats":
             return pages.statistics_lab.layout()
-        elif pathname == "/dashboard":
-            return pages.dashboard.create_dashboard_page()
         elif pathname == "/advanced":
             return pages.advanced.create_advanced_page()
+        elif pathname == "/ml":
+            return pages.ml_studio.create_ml_studio_page()
+        elif pathname == "/home":
+            return pages.home.create_home_page()
         else:
-            # Default: welcome page
-            return pages.welcome.create_welcome_page()
+            # Default: home page
+            return pages.home.create_home_page()
     except Exception as e:
         import traceback
+        err_msg = traceback.format_exc()
+        with open("debug_trace.txt", "w", encoding="utf-8") as f:
+            f.write(err_msg)
         traceback.print_exc()
         return html.Div(
             className="dvs-empty",
@@ -119,8 +129,12 @@ def route_page(pathname: str):
 def update_sidebar_active(pathname: str):
     """根据当前路径高亮侧边栏。"""
     nav_items = []
+    current_path = pathname
+    if not current_path or current_path == "/":
+        current_path = "/home"
+
     for item in config.NAV_ITEMS:
-        active = pathname == item["href"]
+        active = current_path == item["href"]
         cls = "dvs-sidebar__item"
         if active:
             cls += " dvs-sidebar__item--active"
@@ -130,18 +144,27 @@ def update_sidebar_active(pathname: str):
                 className=cls,
                 href=item["href"],
                 children=[
-                    html.Span(item["icon"], className="dvs-sidebar__icon"),
+                    html.I(className=f"{item['icon']} dvs-sidebar__icon"),
                     html.Span(item["label"], className="dvs-sidebar__label"),
                 ],
             )
         )
 
     return [
+        html.Div(
+            className="dvs-topbar__brand",
+            style={"padding": "0 16px", "marginBottom": "24px", "marginTop": "8px"},
+            children=[
+                html.I(className="bi bi-bar-chart-fill dvs-topbar__brand-icon"),
+                html.Span("DataViz "),
+                html.Span("Studio", className="dvs-topbar__brand-accent"),
+            ],
+        ),
         *nav_items,
         html.Div(
             id="sidebar-toggle",
             className="dvs-sidebar__toggle",
-            children=[html.Span("◀", id="sidebar-toggle-icon")],
+            children=[html.I(className="bi bi-chevron-bar-left", id="sidebar-toggle-icon")],
         ),
     ]
 
@@ -152,7 +175,7 @@ def update_sidebar_active(pathname: str):
 app.clientside_callback(
     dash.ClientsideFunction(namespace="sidebar", function_name="toggle"),
     Output("sidebar", "className"),
-    Output("sidebar-toggle-icon", "children"),
+    Output("sidebar-toggle-icon", "className"),
     Input("sidebar-toggle", "n_clicks"),
     State("sidebar", "className"),
 )
@@ -167,6 +190,219 @@ app.clientside_callback(
     Input("btn-theme-toggle", "n_clicks"),
     prevent_initial_call=True,
 )
+
+
+# ── 顶栏页面标题同步 ───────────────────────────────────────────
+
+_PAGE_LABEL_MAP = {
+    "/":          "欢迎",
+    "/canvas":    "数据画布",
+    "/data":      "数据中心",
+    "/workshop":  "数据工坊",
+    "/charts":    "图表工作室",
+    "/stats":     "统计实验室",
+    "/profiling": "数据概况",
+    "/dashboard": "仪表盘",
+    "/advanced":  "高级工具",
+    "/ml":        "机器学习",
+}
+
+@callback(
+    Output("topbar-page-title", "children"),
+    Input("url", "pathname"),
+)
+def update_page_title(pathname: str):
+    """同步顶栏页面标题为静态文字。"""
+    return "系统状态"
+
+
+@callback(
+    Output("topbar-status-badges", "children"),
+    Input("url", "pathname"),
+    Input("app-store", "data"),
+)
+def update_topbar_badges(pathname, store_data):
+    """在页面标题右侧显示平台状态数据集徽章。"""
+    dm = DataManager()
+    meta = dm.get_meta()
+    if meta is None:
+        return []
+    return [
+        html.Span(
+            style={
+                "display": "inline-flex", "alignItems": "center", "gap": "4px",
+                "background": "rgba(56,161,105,0.10)", "color": "#38A169",
+                "borderRadius": "6px", "padding": "2px 8px",
+                "fontSize": "0.75rem", "fontWeight": "600",
+            },
+            children=[
+                html.I(className="bi bi-check-circle-fill", style={"fontSize": "0.7rem"}),
+                f" 当前数据集: {meta.name}",
+            ]
+        ),
+        html.Span(
+            style={
+                "display": "inline-flex", "alignItems": "center",
+                "background": "rgba(49,130,206,0.08)", "color": "#3182CE",
+                "borderRadius": "6px", "padding": "2px 8px",
+                "fontSize": "0.75rem", "fontWeight": "600",
+            },
+            children=f"{meta.rows:,} 行 \u00d7 {meta.cols} 列",
+        ),
+    ]
+
+
+def _sysinfo_bar(label: str, icon: str, pct: float, color: str) -> html.Div:
+    """渲染单个系统指标：进度条 + 图标 + 数字（OpenWrt 风格）"""
+    # 根据使用率调整颜色
+    if pct >= 90:
+        bar_color = "#E53E3E"  # 红 - 危险
+    elif pct >= 70:
+        bar_color = "#DD6B20"  # 橙 - 警告
+    else:
+        bar_color = color
+    return html.Div(
+        style={
+            "display": "flex", "flexDirection": "column", "gap": "2px",
+            "minWidth": "80px", "maxWidth": "110px",
+        },
+        children=[
+            html.Div(
+                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center"},
+                children=[
+                    html.Span(
+                        [html.I(className=f"bi {icon}", style={"marginRight": "3px"}), label],
+                        style={"fontSize": "0.68rem", "color": "var(--text-secondary, #718096)", "fontWeight": "600"}
+                    ),
+                    html.Span(
+                        f"{pct:.0f}%",
+                        style={"fontSize": "0.72rem", "fontWeight": "700", "color": bar_color}
+                    ),
+                ]
+            ),
+            # 进度条背景
+            html.Div(
+                style={
+                    "width": "100%", "height": "4px",
+                    "borderRadius": "2px",
+                    "background": "rgba(0,0,0,0.08)",
+                    "overflow": "hidden",
+                },
+                children=[
+                    html.Div(style={
+                        "width": f"{min(pct, 100):.1f}%",
+                        "height": "100%",
+                        "background": bar_color,
+                        "transition": "width 0.4s ease",
+                        "borderRadius": "2px",
+                    })
+                ]
+            ),
+        ]
+    )
+
+
+@callback(
+    Output("topbar-sysinfo", "children"),
+    Input("sysinfo-interval", "n_intervals"),
+)
+def update_topbar_sysinfo(n):
+    """每 5 秒刷新系统状态（CPU / 内存 / 磁盘）。"""
+    if not _HAS_PSUTIL:
+        return [html.Span("psutil 未安装", style={"fontSize": "0.7rem", "color": "#718096"})]
+    try:
+        p = psutil.Process(os.getpid())
+        # 获取自上次调用以来的进程CPU使用率
+        app_cpu = p.cpu_percent(interval=None)
+        
+        # 判定执行状态 (> 2.0 视为计算中)
+        is_executing = app_cpu > 2.0
+        if is_executing:
+            status_color = "#DD6B20"
+            status_text = "Python 执行中"
+            status_icon = "bi bi-gear-wide-connected"
+            pulse_class = "spin-slow" # 假设有一点旋转效果，退而求其次用静态
+        else:
+            status_color = "#38A169"
+            status_text = "Python 空闲中"
+            status_icon = "bi bi-check-circle-fill"
+            pulse_class = ""
+
+        status_badge = html.Div(
+            [html.I(className=f"{status_icon} {pulse_class}", style={"color": status_color, "fontSize": "10px", "marginRight": "6px"}), status_text],
+            style={
+                "fontSize": "0.72rem",
+                "fontWeight": "600",
+                "color": status_color,
+                "display": "flex",
+                "alignItems": "center",
+                "background": f"rgba({int(status_color[1:3], 16)}, {int(status_color[3:5], 16)}, {int(status_color[5:7], 16)}, 0.1)",
+                "padding": "4px 12px",
+                "borderRadius": "16px",
+                "marginRight": "8px",
+                "border": f"1px solid rgba({int(status_color[1:3], 16)}, {int(status_color[3:5], 16)}, {int(status_color[5:7], 16)}, 0.3)"
+            }
+        )
+
+        cpu = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory().percent
+        disk = psutil.disk_usage("/").percent
+        
+        from datetime import datetime
+        import time
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # 计算已运行时间
+        uptime_seconds = int(time.time() - p.create_time())
+        hours, rem = divmod(uptime_seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
+        if hours > 0:
+            uptime_str = f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            uptime_str = f"{minutes}m {seconds}s"
+        else:
+            uptime_str = f"{seconds}s"
+
+        return [
+            status_badge,
+            html.Div(
+                [
+                    html.I(className="bi bi-clock", style={"marginRight": "6px"}), 
+                    html.Span(current_time, style={"marginRight": "12px"}),
+                    html.I(className="bi bi-hourglass-split", style={"marginRight": "4px", "color": "var(--primary)"}),
+                    html.Span(f"已运行: {uptime_str}", style={"color": "var(--primary)"})
+                ],
+                style={
+                    "fontSize": "0.72rem",
+                    "fontWeight": "600",
+                    "color": "var(--text-secondary)",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "background": "rgba(0,0,0,0.04)",
+                    "padding": "4px 12px",
+                    "borderRadius": "16px",
+                    "marginRight": "12px",
+                }
+            ),
+            _sysinfo_bar("CPU", "bi-cpu", cpu, "#FF6B35"),
+            _sysinfo_bar("内存", "bi-memory", mem, "#3182CE"),
+            _sysinfo_bar("磁盘", "bi-hdd", disk, "#805AD5"),
+        ]
+    except Exception:
+        return []
+
+
+# ── 快速操作 Offcanvas ───────────────────────────────────────────
+
+@callback(
+    Output("quick-action-offcanvas", "is_open"),
+    Input("btn-quick-action", "n_clicks"),
+    State("quick-action-offcanvas", "is_open"),
+    prevent_initial_call=True,
+)
+def toggle_quick_action(n_clicks, is_open):
+    """切换快速操作面板。"""
+    return not is_open
 
 
 # ── 关于弹窗 ───────────────────────────────────────────
@@ -218,11 +454,20 @@ def show_toast(store_data):
 
     toast = store_data["toast"]
     toast_type = toast.get("type", "info")
-    return html.Div(
-        className=f"dvs-toast dvs-toast--{toast_type}",
-        children=[
-            html.Span(toast["message"], style={"fontSize": "var(--text-sm)"}),
-        ],
+    # 映射图标类型
+    icon_type = "danger" if toast_type == "error" else toast_type
+    if icon_type not in ["primary", "secondary", "success", "warning", "danger", "info"]:
+        icon_type = "info"
+
+    return dbc.Toast(
+        [html.Span(toast["message"], style={"fontSize": "var(--text-sm)"})],
+        id="global-toast",
+        header="消息提示",
+        is_open=True,
+        dismissable=True,
+        icon=icon_type,
+        duration=4000,
+        style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999},
     )
 
 

@@ -14,19 +14,19 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 
 from core.data_manager import DataManager
-from services.data_loader import load_file
+from services.data_loader import load_file, load_from_database
 from utils.helpers import format_number, format_size
 
 
 # ── 数据源定义 ─────────────────────────────────────────
 
 DATA_SOURCES = [
-    {"icon": "📄", "label": "CSV / TSV", "enabled": True},
-    {"icon": "📊", "label": "Excel", "enabled": True},
-    {"icon": "🔗", "label": "JSON", "enabled": True},
-    {"icon": "🗄️", "label": "数据库", "enabled": False},
-    {"icon": "🌐", "label": "URL", "enabled": True},
-    {"icon": "📋", "label": "粘贴板", "enabled": True},
+    {"id": "csv", "icon": "bi bi-file-earmark-text", "label": "CSV / TSV", "type": "file"},
+    {"id": "excel", "icon": "bi bi-file-earmark-spreadsheet", "label": "Excel", "type": "file"},
+    {"id": "json", "icon": "bi bi-braces", "label": "JSON", "type": "file"},
+    {"id": "db", "icon": "bi bi-database", "label": "数据库", "type": "modal"},
+    {"id": "url", "icon": "bi bi-globe", "label": "URL", "type": "modal"},
+    {"id": "paste", "icon": "bi bi-clipboard", "label": "粘贴板", "type": "modal"},
 ]
 
 
@@ -37,23 +37,35 @@ def create_data_hub_page() -> html.Div:
     source_cards = []
     for src in DATA_SOURCES:
         cls = "dvs-source-card card-hover stagger-item"
-        if not src["enabled"]:
-            cls += " dvs-source-card--disabled"
-        card = html.Div(
+        kwargs = {}
+        if src["type"] == "modal":
+            kwargs["id"] = f"card-{src['id']}"
+            kwargs["n_clicks"] = 0
+
+        card_content = html.Div(
             className=cls,
             children=[
-                html.Span(src["icon"], className="dvs-source-card__icon"),
+                html.I(className=f"{src['icon']} dvs-source-card__icon"),
                 html.Span(src["label"], className="dvs-source-card__label"),
-                *([] if src["enabled"] else [
-                    html.Span("即将推出", className="dvs-badge dvs-badge--soon"),
-                ]),
             ],
+            **kwargs
         )
-        source_cards.append(card)
+
+        if src["type"] == "file":
+            source_cards.append(
+                dcc.Upload(
+                    id=f"upload-{src['id']}",
+                    children=card_content,
+                    multiple=True,
+                    style={"display": "inline-block", "textDecoration": "none"}
+                )
+            )
+        else:
+            source_cards.append(card_content)
 
     return html.Div(
         children=[
-            html.H2("📁 数据中心", className="dvs-page-title"),
+            html.H2("数据中心", className="dvs-page-title"),
 
             # Source type cards
             html.Div(className="dvs-source-cards stagger-container", children=source_cards),
@@ -64,7 +76,7 @@ def create_data_hub_page() -> html.Div:
                 children=html.Div(
                     className="dvs-upload-zone fade-in",
                     children=[
-                        html.Div("📂", className="dvs-upload-zone__icon"),
+                        html.I(className="bi bi-folder-plus dvs-upload-zone__icon"),
                         html.Div("拖拽文件到此处，或点击选择文件", className="dvs-upload-zone__title"),
                         html.Div("支持 CSV、TSV、Excel (.xlsx/.xls)、JSON、Parquet、Feather 格式", className="dvs-upload-zone__hint"),
                     ],
@@ -73,82 +85,98 @@ def create_data_hub_page() -> html.Div:
                 style={"marginBottom": "var(--sp-4)"},
             ),
 
-            # URL 导入区域
-            html.Div(
-                style={"marginBottom": "var(--sp-4)"},
-                children=[
+            # ── Modals (隐藏的弹窗) ──
+            
+            # URL 导入弹窗
+            dbc.Modal([
+                dbc.ModalHeader(dbc.ModalTitle("从 URL 导入", className="dvs-page-subtitle")),
+                dbc.ModalBody(
                     html.Div(
-                        className="dvs-section-header",
-                        children=[
-                            html.Span("🌐 从 URL 导入", className="dvs-section-header__title"),
-                        ],
-                    ),
-                    html.Div(
-                        style={"display": "flex", "gap": "8px", "alignItems": "center", "padding": "8px 0"},
+                        style={"display": "flex", "flexDirection": "column", "gap": "12px", "padding": "8px 0"},
                         children=[
                             dcc.Input(
-                                id="datahub-url-input",
-                                type="url",
+                                id="datahub-url-input", type="url",
                                 placeholder="输入 CSV/JSON 文件的 URL，如 https://example.com/data.csv",
-                                style={"flex": "1", "padding": "8px 12px", "borderRadius": "6px",
+                                style={"width": "100%", "padding": "8px 12px", "borderRadius": "6px",
                                        "border": "1px solid var(--border)", "backgroundColor": "var(--bg-secondary)",
                                        "color": "var(--text-primary)", "fontSize": "0.875rem"},
                             ),
-                            html.Button(
-                                "导入",
-                                id="datahub-url-btn",
-                                className="dvs-btn dvs-btn--primary btn-hover",
-                                style={"padding": "8px 20px", "whiteSpace": "nowrap"},
+                        ]
+                    )
+                ),
+                dbc.ModalFooter(
+                    html.Button("导入", id="datahub-url-btn", className="dvs-btn dvs-btn--primary btn-hover")
+                ),
+            ], id="modal-url", is_open=False, centered=True),
+
+            # 数据库导入弹窗
+            dbc.Modal([
+                dbc.ModalHeader(dbc.ModalTitle("从数据库加载", className="dvs-page-subtitle")),
+                dbc.ModalBody(
+                    html.Div(
+                        style={"display": "flex", "flexDirection": "column", "gap": "12px", "padding": "8px 0"},
+                        children=[
+                            html.Div(
+                                "支持 SQLite、MySQL、PostgreSQL 等 (格式：sqlite:///data.db 或 mysql+pymysql://user:pwd@host:port/df_name)",
+                                style={"fontSize": "0.8rem", "color": "var(--text-muted)"}
+                            ),
+                            dcc.Input(
+                                id="datahub-db-connection", type="text",
+                                placeholder="输入 SQLAlchemy 数据库连接字符串",
+                                style={"width": "100%", "padding": "8px 12px", "borderRadius": "6px",
+                                       "border": "1px solid var(--border)", "backgroundColor": "var(--bg-secondary)",
+                                       "color": "var(--text-primary)", "fontSize": "0.875rem"},
+                            ),
+                            dcc.Textarea(
+                                id="datahub-db-query",
+                                placeholder="执行查询语句，例如：SELECT * FROM users LIMIT 1000",
+                                style={"width": "100%", "height": "80px", "padding": "10px",
+                                       "borderRadius": "6px", "border": "1px solid var(--border)",
+                                       "backgroundColor": "var(--bg-secondary)", "color": "var(--text-primary)",
+                                       "fontSize": "0.85rem", "fontFamily": "monospace", "resize": "vertical"},
                             ),
                         ],
-                    ),
-                ],
-            ),
+                    )
+                ),
+                dbc.ModalFooter(
+                    html.Button("查询并导入", id="datahub-db-btn", className="dvs-btn dvs-btn--primary btn-hover")
+                ),
+            ], id="modal-db", is_open=False, centered=True, size="lg"),
 
-            # 粘贴板导入区域
-            html.Div(
-                style={"marginBottom": "var(--sp-4)"},
-                children=[
+            # 粘贴板导入弹窗
+            dbc.Modal([
+                dbc.ModalHeader(dbc.ModalTitle("从粘贴板导入", className="dvs-page-subtitle")),
+                dbc.ModalBody(
                     html.Div(
-                        className="dvs-section-header",
+                        style={"display": "flex", "flexDirection": "column", "gap": "12px", "padding": "8px 0"},
                         children=[
-                            html.Span("📋 从粘贴板导入", className="dvs-section-header__title"),
-                        ],
-                    ),
-                    dcc.Textarea(
-                        id="datahub-paste-input",
-                        placeholder="粘贴表格数据（支持 Tab 分隔或逗号分隔）\n例如：\nname,age,city\nAlice,25,NYC\nBob,30,LA",
-                        style={"width": "100%", "height": "120px", "padding": "10px",
-                               "borderRadius": "6px", "border": "1px solid var(--border)",
-                               "backgroundColor": "var(--bg-secondary)", "color": "var(--text-primary)",
-                               "fontSize": "0.85rem", "fontFamily": "monospace", "resize": "vertical"},
-                    ),
-                    html.Div(
-                        style={"display": "flex", "gap": "8px", "marginTop": "8px", "alignItems": "center"},
-                        children=[
+                            dcc.Textarea(
+                                id="datahub-paste-input",
+                                placeholder="粘贴表格数据（支持 Tab 分隔或逗号分隔）\n例如：\nname,age,city\nAlice,25,NYC\nBob,30,LA",
+                                style={"width": "100%", "height": "160px", "padding": "10px",
+                                       "borderRadius": "6px", "border": "1px solid var(--border)",
+                                       "backgroundColor": "var(--bg-secondary)", "color": "var(--text-primary)",
+                                       "fontSize": "0.85rem", "fontFamily": "monospace", "resize": "vertical"},
+                            ),
                             dcc.Dropdown(
                                 id="datahub-paste-sep",
                                 options=[
-                                    {"label": "自动检测", "value": "auto"},
-                                    {"label": "逗号 (,)", "value": ","},
-                                    {"label": "Tab (\\t)", "value": "\t"},
-                                    {"label": "分号 (;)", "value": ";"},
-                                    {"label": "管道 (|)", "value": "|"},
+                                    {"label": "自动检测模式", "value": "auto"},
+                                    {"label": "使用逗号 (,)", "value": ","},
+                                    {"label": "使用 Tab (\\t)", "value": "\t"},
+                                    {"label": "使用分号 (;)", "value": ";"},
+                                    {"label": "使用管道 (|)", "value": "|"},
                                 ],
                                 value="auto",
                                 clearable=False,
-                                style={"width": "160px"},
                             ),
-                            html.Button(
-                                "导入粘贴数据",
-                                id="datahub-paste-btn",
-                                className="dvs-btn dvs-btn--primary btn-hover",
-                                style={"padding": "8px 20px"},
-                            ),
-                        ],
-                    ),
-                ],
-            ),
+                        ]
+                    )
+                ),
+                dbc.ModalFooter(
+                    html.Button("导入粘贴数据", id="datahub-paste-btn", className="dvs-btn dvs-btn--primary btn-hover")
+                ),
+            ], id="modal-paste", is_open=False, centered=True, size="lg"),
 
             # Dataset list
             html.Div(
@@ -169,12 +197,30 @@ def create_data_hub_page() -> html.Div:
     Output("app-store", "data", allow_duplicate=True),
     Output("url", "pathname", allow_duplicate=True),
     Input("datahub-upload", "contents"),
+    Input("upload-csv", "contents"),
+    Input("upload-excel", "contents"),
+    Input("upload-json", "contents"),
     State("datahub-upload", "filename"),
+    State("upload-csv", "filename"),
+    State("upload-excel", "filename"),
+    State("upload-json", "filename"),
     State("app-store", "data"),
     prevent_initial_call=True,
 )
-def on_datahub_upload(contents, filename, store_data):
+def on_datahub_upload(c_main, c_csv, c_excel, c_json, f_main, f_csv, f_excel, f_json, store_data):
     """数据中心文件上传（支持多文件）。"""
+    ctx_id = ctx.triggered_id
+    if ctx_id == "datahub-upload":
+        contents, filename = c_main, f_main
+    elif ctx_id == "upload-csv":
+        contents, filename = c_csv, f_csv
+    elif ctx_id == "upload-excel":
+        contents, filename = c_excel, f_excel
+    elif ctx_id == "upload-json":
+        contents, filename = c_json, f_json
+    else:
+        return no_update, no_update
+
     if contents is None or filename is None:
         return no_update, no_update
 
@@ -209,6 +255,42 @@ def on_datahub_upload(contents, filename, store_data):
 
     store_data["toast"] = {"message": f"全部加载失败：{'; '.join(errors)}", "type": "error"}
     return store_data, no_update
+
+
+# ── 弹窗控制 ──────────────────────────────────────────
+
+@callback(
+    Output("modal-url", "is_open"),
+    Input("card-url", "n_clicks"),
+    State("modal-url", "is_open"),
+    prevent_initial_call=True
+)
+def toggle_modal_url(n, is_open):
+    if n:
+        return not is_open
+    return is_open
+
+@callback(
+    Output("modal-db", "is_open"),
+    Input("card-db", "n_clicks"),
+    State("modal-db", "is_open"),
+    prevent_initial_call=True
+)
+def toggle_modal_db(n, is_open):
+    if n:
+        return not is_open
+    return is_open
+
+@callback(
+    Output("modal-paste", "is_open"),
+    Input("card-paste", "n_clicks"),
+    State("modal-paste", "is_open"),
+    prevent_initial_call=True
+)
+def toggle_modal_paste(n, is_open):
+    if n:
+        return not is_open
+    return is_open
 
 
 # ── URL 导入 ──────────────────────────────────────────
@@ -321,6 +403,51 @@ def on_paste_import(n_clicks, paste_text, sep, store_data):
         return store_data, no_update
 
 
+# ── 数据库导入 ────────────────────────────────────────
+
+@callback(
+    Output("app-store", "data", allow_duplicate=True),
+    Output("url", "pathname", allow_duplicate=True),
+    Input("datahub-db-btn", "n_clicks"),
+    State("datahub-db-connection", "value"),
+    State("datahub-db-query", "value"),
+    State("app-store", "data"),
+    prevent_initial_call=True,
+)
+def on_db_import(n_clicks, conn_str, query_str, store_data):
+    """从数据库加载数据"""
+    if not conn_str or not conn_str.strip() or not query_str or not query_str.strip():
+        return no_update, no_update
+
+    store_data = store_data or {}
+    try:
+        df = load_from_database(conn_str.strip(), query_str.strip())
+        
+        # 提取连接字符串的 db 名字片段作为大致名称
+        import urllib.parse
+        parsed = urllib.parse.urlparse(conn_str.strip())
+        db_name = parsed.path.lstrip('/') if parsed.path else "database"
+        db_name = db_name.split('.')[0] # e.g. /my_data.db -> my_data
+        if not db_name:
+            db_name = "db_data"
+            
+        filename = f"{db_name}_query"
+
+        dm = DataManager()
+        name = dm.add_dataset(filename, df, source=f"db:{conn_str}")
+
+        store_data["active_dataset"] = name
+        store_data["datasets"] = dm.dataset_names
+        store_data["toast"] = {
+            "message": f"已从数据库加载查询结果（{len(df)} 行 × {len(df.columns)} 列）",
+            "type": "success",
+        }
+        return store_data, "/canvas"
+
+    except Exception as e:
+        store_data["toast"] = {"message": f"数据库加载失败：{str(e)}", "type": "error"}
+        return store_data, no_update
+
 # ── 数据集列表 ────────────────────────────────────────
 
 @callback(
@@ -357,7 +484,7 @@ def update_dataset_list(store_data):
                     html.Div(
                         className="dvs-dataset-item__info",
                         children=[
-                            html.Span(f"📊 {meta.name}", className="dvs-dataset-item__name"),
+                            html.Span(meta.name, className="dvs-dataset-item__name"),
                             html.Span(
                                 f"{format_number(meta.rows)} 行 × {meta.cols} 列 | {meta.memory_mb:.1f} MB",
                                 className="dvs-dataset-item__meta",

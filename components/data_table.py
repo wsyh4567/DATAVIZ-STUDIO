@@ -41,7 +41,7 @@ def create_data_table(
             id=table_id,
             rowData=[],
             columnDefs=[],
-            className="ag-theme-alpine-dark",
+            className="ag-theme-alpine",
             style={"height": "calc(100vh - 320px)", "width": "100%"},
             dashGridOptions={
                 "animateRows": True,
@@ -118,7 +118,7 @@ def create_data_table(
         id=table_id,
         rowData=row_data,
         columnDefs=col_defs,
-        className="ag-theme-alpine-dark",
+        className="ag-theme-alpine",
         style={"height": "calc(100vh - 320px)", "width": "100%"},
         defaultColDef={
             "sortable": True,

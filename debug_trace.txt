@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "C:\Users\Toxic\Desktop\python\python项目DataViz Studio\app.py", line 104, in route_page
+    return pages.ml_studio.create_ml_studio_page()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Toxic\Desktop\python\python项目DataViz Studio\pages\ml_studio.py", line 31, in create_ml_studio_page
+    df = dm.active_df
+         ^^^^^^^^^^^^^
+AttributeError: 'DataManager' object has no attribute 'get_current_df'

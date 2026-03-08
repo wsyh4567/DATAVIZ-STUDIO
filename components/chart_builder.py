@@ -195,12 +195,12 @@ def create_chart_config_panel() -> html.Div:
                     dcc.Dropdown(
                         id="chart-theme-dropdown",
                         options=[
-                            {"label": "暗色（默认）", "value": "plotly_dark"},
-                            {"label": "亮色", "value": "plotly_white"},
-                            {"label": "简约", "value": "simple_white"},
-                            {"label": "科技", "value": "plotly"},
+                            {"label": "明亮（默认）", "value": "plotly_white"},
+                            {"label": "经典", "value": "plotly"},
+                            {"label": "极简", "value": "simple_white"},
+                            {"label": "暗色", "value": "plotly_dark"}
                         ],
-                        value="plotly_dark",
+                        value="plotly_white",
                         clearable=False,
                         className="dropdown-dark",
                     ),

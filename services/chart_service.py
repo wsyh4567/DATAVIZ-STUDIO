@@ -21,13 +21,13 @@ import matplotlib
 matplotlib.use('Agg')  # 使用非交互式后端
 
 
-class ChartLibrary(Enum):
+class ChartLibrary(str, Enum):
     """图表库枚举"""
     PLOTLY = "plotly"
     SEABORN = "seaborn"
 
 
-class ChartType(Enum):
+class ChartType(str, Enum):
     """图表类型枚举"""
     # Plotly 和 Seaborn 通用
     scatter = "scatter"
@@ -94,13 +94,14 @@ class ChartService:
 
     def _apply_plotly_style(self, fig, style_params: Dict[str, Any]):
         """应用 Plotly 图表样式配置"""
-        template = style_params.get('template', 'plotly_dark')
+        template = style_params.get('template', 'plotly_white')
         title = style_params.get('title', None)
         show_legend = style_params.get('show_legend', True)
         show_grid = style_params.get('show_grid', True)
         width = style_params.get('width', None)
         height = style_params.get('height', None)
         color_scale = style_params.get('color_scale', None)
+        color_discrete_sequence = style_params.get('color_discrete_sequence')
 
         layout_update = {
             'template': template,
@@ -131,6 +132,10 @@ class ChartService:
         if not show_grid:
             fig.update_xaxes(showgrid=False)
             fig.update_yaxes(showgrid=False)
+            
+        opacity = style_params.get('opacity')
+        if opacity is not None and opacity < 1.0:
+            fig.update_traces(opacity=opacity)
 
     def _create_plotly_chart(
         self,
@@ -141,119 +146,150 @@ class ChartService:
         """使用 Plotly 创建图表"""
 
         # 分离样式参数和图表参数
-        style_keys = {'template', 'title', 'show_legend', 'show_grid', 'width', 'height', 'color_scale'}
+        style_keys = {'template', 'title', 'show_legend', 'show_grid', 'width', 'height', 'color_scale', 'color_discrete_sequence', 'opacity', 'secondary_y'}
         style_params = {k: v for k, v in params.items() if k in style_keys and v is not None}
         chart_params = {k: v for k, v in params.items() if k not in style_keys and v is not None}
 
-        # px 函数映射
-        chart_functions = {
-            ChartType.scatter: px.scatter,
-            ChartType.line: px.line,
-            ChartType.bar: px.bar,
-            ChartType.histogram: px.histogram,
-            ChartType.box: px.box,
-            ChartType.violin: px.violin,
-            ChartType.scatter_3d: px.scatter_3d,
-            ChartType.pie: px.pie,
-            ChartType.sunburst: px.sunburst,
-            ChartType.treemap: px.treemap,
-            ChartType.funnel: px.funnel,
-            ChartType.density_heatmap: px.density_heatmap,
-            ChartType.area: px.area,
-            ChartType.contour: px.density_contour,
-            ChartType.bar_polar: px.bar_polar,
-            ChartType.splom: px.scatter_matrix,
-            ChartType.parallel: px.parallel_coordinates,
-            ChartType.parallel_cat: px.parallel_categories,
-        }
+        chart_type_str = getattr(chart_type, 'value', str(chart_type))
 
-        # 处理需要特殊逻辑的图表
-        if chart_type == ChartType.hbar:
-            chart_params['orientation'] = 'h'
-            fig = px.bar(df, **chart_params)
-
-        elif chart_type == ChartType.waterfall:
-            x = chart_params.get('x')
-            y = chart_params.get('y')
-            if x and y:
-                fig = go.Figure(go.Waterfall(
-                    x=df[x].tolist(),
-                    y=df[y].tolist(),
-                    connector={"line": {"color": "rgb(63, 63, 63)"}},
-                ))
-                fig.update_layout(title=f"瀑布图: {y} by {x}")
+        if chart_type_str == "scatter":
+            fig = px.scatter(df, **chart_params)
+        elif chart_type_str == "line":
+            fig = px.line(df, **chart_params)
+        elif chart_type_str == "bar":
+            fig = px.bar(df, barmode='group', **chart_params)
+        elif chart_type_str == "hbar":
+            fig = px.bar(df, barmode='group', orientation='h', **chart_params)
+        elif chart_type_str == "histogram":
+            fig = px.histogram(df, **chart_params)
+        elif chart_type_str == "box":
+            fig = px.box(df, **chart_params)
+        elif chart_type_str == "violin":
+            fig = px.violin(df, box=True, **chart_params)
+        elif chart_type_str == "scatter_3d":
+            fig = px.scatter_3d(df, **chart_params)
+        elif chart_type_str == "pie":
+            # 针对特殊图表类型做参数重映射
+            # pie 不接受 x/y，需映射到各自的专用参数名
+            remap = {}
+            if 'x' in chart_params:
+                remap['names'] = chart_params.pop('x')
+            if 'y' in chart_params:
+                remap['values'] = chart_params.pop('y')
+            # 移除不支持的通用参数
+            for k in ('size', 'facet_row', 'facet_col',
+                      'animation_frame', 'trendline',
+                      'marginal_x', 'marginal_y', 'hover_data'):
+                chart_params.pop(k, None)
+            chart_params.update(remap)
+            fig = px.pie(df, **chart_params)
+        elif chart_type_str == "sunburst":
+            remap = {}
+            if 'x' in chart_params:
+                # path 需要列表（层级列）
+                x_val = chart_params.pop('x')
+                remap['path'] = [x_val]  # 单层层级
+            if 'color' in chart_params and 'y' not in chart_params:
+                # 有 color 但无 values，用 color 列作为值
+                pass
+            if 'y' in chart_params:
+                remap['values'] = chart_params.pop('y')
+            for k in ('size', 'facet_row', 'facet_col',
+                      'animation_frame', 'trendline',
+                      'marginal_x', 'marginal_y', 'hover_data'):
+                chart_params.pop(k, None)
+            chart_params.update(remap)
+            fig = px.sunburst(df, **chart_params)
+        elif chart_type_str == "treemap":
+            remap = {}
+            if 'x' in chart_params:
+                # path 需要列表（层级列）
+                x_val = chart_params.pop('x')
+                remap['path'] = [x_val]  # 单层层级
+            if 'color' in chart_params and 'y' not in chart_params:
+                # 有 color 但无 values，用 color 列作为值
+                pass
+            if 'y' in chart_params:
+                remap['values'] = chart_params.pop('y')
+            for k in ('size', 'facet_row', 'facet_col',
+                      'animation_frame', 'trendline',
+                      'marginal_x', 'marginal_y', 'hover_data'):
+                chart_params.pop(k, None)
+            chart_params.update(remap)
+            fig = px.treemap(df, **chart_params)
+        elif chart_type_str == "funnel":
+            # funnel 接受 x(值) 和 y(阶段)
+            fig = px.funnel(df, **chart_params)
+        elif chart_type_str == "density_heatmap":
+            fig = px.density_heatmap(df, **chart_params)
+        elif chart_type_str == "area":
+            fig = px.area(df, **chart_params)
+        elif chart_type_str == "waterfall":
+            # Plotly Express 暂无 waterfall，直接报错或使用 GO
+            raise NotImplementedError("Plotly Express 暂不支持瀑布图参数化，需特定数据结构。")
+        elif chart_type_str == "radar":
+            fig = px.line_polar(df, line_close=True, **chart_params)
+        elif chart_type_str == "parallel":
+            # 过滤非数值列
+            num_cols = df.select_dtypes(include=[np.number]).columns
+            color = chart_params.pop('color', None)
+            fig = px.parallel_coordinates(df, dimensions=num_cols, color=color, **chart_params)
+        elif chart_type_str == "parallel_cat":
+            # 类别平行坐标
+            cat_cols = df.select_dtypes(include=['object', 'category']).columns
+            fig = px.parallel_categories(df, dimensions=cat_cols, **chart_params)
+        elif chart_type_str == "contour":
+            fig = px.density_contour(df, **chart_params)
+        elif chart_type_str == "surface_3d":
+            # 通常需要网格数据，如果输入是三列的散点数据，可能无法直接绘制
+            if 'z' in chart_params:
+                fig = go.Figure(data=[go.Surface(z=df[chart_params['z']].values)])
             else:
-                raise ValueError("瀑布图需要 x 和 y 参数")
-
-        elif chart_type == ChartType.radar:
-            x = chart_params.get('x')
-            y = chart_params.get('y')
-            color = chart_params.get('color')
-            if x and y:
-                if color and color in df.columns:
-                    fig = go.Figure()
-                    for group_name in df[color].unique():
-                        group_df = df[df[color] == group_name]
-                        fig.add_trace(go.Scatterpolar(
-                            r=group_df[y].tolist(),
-                            theta=group_df[x].tolist(),
-                            fill='toself',
-                            name=str(group_name),
-                        ))
-                else:
-                    fig = go.Figure(go.Scatterpolar(
-                        r=df[y].tolist(),
-                        theta=df[x].tolist(),
-                        fill='toself',
-                    ))
-                fig.update_layout(polar=dict(radialaxis=dict(visible=True)))
-            else:
-                raise ValueError("雷达图需要 x 和 y 参数")
-
-        elif chart_type == ChartType.surface_3d:
-            x = chart_params.get('x')
-            y = chart_params.get('y')
-            z = chart_params.get('z') or chart_params.get('color')
-            if x and y and z:
-                pivot = df.pivot_table(index=y, columns=x, values=z, aggfunc='mean')
-                fig = go.Figure(data=[go.Surface(
-                    z=pivot.values,
-                    x=pivot.columns.tolist(),
-                    y=pivot.index.tolist(),
-                )])
-                fig.update_layout(scene=dict(
-                    xaxis_title=x, yaxis_title=y, zaxis_title=z
-                ))
-            else:
-                raise ValueError("3D曲面图需要 x, y 和 z(color) 参数")
-
+                raise ValueError("3D 曲面图需要 'z' 参数的二维矩阵。")
+        elif chart_type_str == "bar_polar":
+            remap = {}
+            if 'x' in chart_params:
+                remap['theta'] = chart_params.pop('x')
+            if 'y' in chart_params:
+                remap['r'] = chart_params.pop('y')
+            for k in ('size', 'facet_row', 'facet_col',
+                      'animation_frame', 'trendline',
+                      'marginal_x', 'marginal_y', 'hover_data'):
+                chart_params.pop(k, None)
+            chart_params.update(remap)
+            fig = px.bar_polar(df, **chart_params)
+        elif chart_type_str == "splom":
+            # 散点矩阵
+            num_cols = df.select_dtypes(include=[np.number]).columns
+            fig = px.scatter_matrix(df, dimensions=num_cols, **chart_params)
         else:
-            chart_func = chart_functions.get(chart_type)
-            if not chart_func:
-                raise ValueError(f"不支持的 Plotly 图表类型: {chart_type}")
+            raise ValueError(f"不支持的 Plotly 图表类型: {chart_type}")
 
-            # 对 parallel_coordinates 和 scatter_matrix，需要特别处理参数
-            if chart_type == ChartType.parallel:
-                valid_params = {}
-                if 'color' in chart_params:
-                    valid_params['color'] = chart_params['color']
-                fig = chart_func(df, **valid_params)
-            elif chart_type == ChartType.parallel_cat:
-                valid_params = {}
-                if 'color' in chart_params:
-                    valid_params['color'] = chart_params['color']
-                fig = chart_func(df, **valid_params)
-            elif chart_type == ChartType.splom:
-                valid_params = {}
-                if 'color' in chart_params:
-                    valid_params['color'] = chart_params['color']
-                fig = chart_func(df, **valid_params)
-            else:
-                fig = chart_func(df, **chart_params)
+        secondary_y_col = style_params.get('secondary_y')
+        if secondary_y_col and secondary_y_col in df.columns and chart_params.get('x') and chart_type_str in ["scatter", "line", "bar"]:
+            from plotly.subplots import make_subplots
+            sub_fig = make_subplots(specs=[[{"secondary_y": True}]])
+            for trace in fig.data:
+                sub_fig.add_trace(trace, secondary_y=False)
+            
+            sub_fig.add_trace(
+                go.Scatter(
+                    x=df[chart_params.get('x')], 
+                    y=df[secondary_y_col], 
+                    name=secondary_y_col, 
+                    mode='lines',
+                    line=dict(color='#E53E3E', dash='dash')
+                ),
+                secondary_y=True
+            )
+            sub_fig.layout.update(fig.layout)
+            sub_fig.update_yaxes(title_text=chart_params.get('y', ''), secondary_y=False)
+            sub_fig.update_yaxes(title_text=secondary_y_col, secondary_y=True)
+            fig = sub_fig
 
         # 应用样式
         self._apply_plotly_style(fig, style_params if style_params else {
-            'template': 'plotly_dark'
+            'template': 'plotly_white'
         })
 
         return {
@@ -269,19 +305,52 @@ class ChartService:
     ) -> Dict[str, Any]:
         """使用 Seaborn 创建图表"""
 
+        chart_type_str = getattr(chart_type, 'value', str(chart_type))
+
         # 分离样式参数
         style_keys = {'template', 'title', 'show_legend', 'show_grid', 'width', 'height', 'color_scale'}
         style_params = {k: v for k, v in params.items() if k in style_keys and v is not None}
         chart_params = {k: v for k, v in params.items() if k not in style_keys and v is not None}
 
         # 设置样式
-        sns.set_theme(style="darkgrid")
-        plt.rcParams['figure.facecolor'] = '#1B1D2A'
-        plt.rcParams['axes.facecolor'] = '#262940'
-        plt.rcParams['text.color'] = '#F1F5F9'
-        plt.rcParams['axes.labelcolor'] = '#F1F5F9'
-        plt.rcParams['xtick.color'] = '#F1F5F9'
-        plt.rcParams['ytick.color'] = '#F1F5F9'
+        template = style_params.get('template', 'plotly_white')
+        is_dark = 'dark' in str(template).lower()
+        
+        if is_dark:
+            sns.set_theme(style="darkgrid")
+            face_color = '#1B1D2A'
+            plt.rcParams['figure.facecolor'] = face_color
+            plt.rcParams['axes.facecolor'] = '#262940'
+            plt.rcParams['text.color'] = '#F1F5F9'
+            plt.rcParams['axes.labelcolor'] = '#F1F5F9'
+            plt.rcParams['xtick.color'] = '#F1F5F9'
+            plt.rcParams['ytick.color'] = '#F1F5F9'
+        else:
+            sns.set_theme(style="whitegrid")
+            face_color = '#FFFFFF'
+            plt.rcParams['figure.facecolor'] = face_color
+            plt.rcParams['axes.facecolor'] = '#F8F9FA'
+            plt.rcParams['text.color'] = '#2D3748'
+            plt.rcParams['axes.labelcolor'] = '#4A5568'
+            plt.rcParams['xtick.color'] = '#718096'
+            plt.rcParams['ytick.color'] = '#718096'
+
+        # 设置调色板：优先取样式面板的 color_scale，若无则取专用面板的 palette
+        palette = style_params.get('color_scale') or chart_params.pop('palette', 'deep')
+        if palette:
+            try:
+                # 尽量转为小写适配 Seaborn
+                palette_name = palette.lower() if isinstance(palette, str) else palette
+                sns.set_palette(palette_name)
+                # 存回 chart_params 供某些图表强制重写（如 heatmap cmap）
+                chart_params['palette'] = palette_name
+            except Exception:
+                sns.set_palette('deep')
+
+        # 透明度参数
+        opacity = style_params.get('opacity')
+        if opacity is not None:
+            chart_params['alpha'] = float(opacity)
 
         fig_width = int(style_params.get('width', 800)) / 80
         fig_height = int(style_params.get('height', 480)) / 80
@@ -289,18 +358,16 @@ class ChartService:
         # 特殊多面板图表（pairplot, jointplot 自带 figure）
         needs_fig = True
 
-        if chart_type == ChartType.pairplot:
+        if chart_type_str == "pairplot":
             needs_fig = False
             pp_params = {}
             if 'hue' in chart_params:
                 pp_params['hue'] = chart_params['hue']
-            if 'palette' in chart_params:
-                pp_params['palette'] = chart_params['palette']
             g = sns.pairplot(df, **pp_params)
             fig = g.figure
-            fig.set_facecolor('#1B1D2A')
+            fig.set_facecolor(face_color)
 
-        elif chart_type == ChartType.jointplot:
+        elif chart_type_str == "jointplot":
             needs_fig = False
             jp_params = {}
             for k in ('x', 'y', 'hue'):
@@ -308,50 +375,99 @@ class ChartService:
                     jp_params[k] = chart_params[k]
             g = sns.jointplot(data=df, **jp_params)
             fig = g.figure
-            fig.set_facecolor('#1B1D2A')
+            fig.set_facecolor(face_color)
 
         else:
             fig, ax = plt.subplots(figsize=(fig_width, fig_height))
 
-            if chart_type == ChartType.scatter:
+            # 提前弹出 secondary_y 用于双Y轴，防止报错
+            secondary_y_col = chart_params.pop('secondary_y', None)
+
+            if chart_type_str == "scatter":
                 sns.scatterplot(data=df, ax=ax, **chart_params)
-            elif chart_type == ChartType.line:
+            elif chart_type_str == "line":
                 sns.lineplot(data=df, ax=ax, **chart_params)
-            elif chart_type == ChartType.bar:
+            elif chart_type_str == "bar":
                 sns.barplot(data=df, ax=ax, **chart_params)
-            elif chart_type == ChartType.histogram:
+            elif chart_type_str == "histogram":
                 sns.histplot(data=df, ax=ax, **chart_params)
-            elif chart_type == ChartType.box:
+            elif chart_type_str == "box":
                 sns.boxplot(data=df, ax=ax, **chart_params)
-            elif chart_type == ChartType.violin:
+            elif chart_type_str == "violin":
                 sns.violinplot(data=df, ax=ax, **chart_params)
-            elif chart_type == ChartType.heatmap:
-                pivot_data = df.pivot_table(
-                    index=chart_params.get('y'),
-                    columns=chart_params.get('x'),
-                    values=chart_params.get('values'),
-                    aggfunc='mean'
-                )
-                sns.heatmap(pivot_data, ax=ax, cmap=chart_params.get('palette', 'viridis'))
-            elif chart_type == ChartType.kdeplot:
-                kde_params = {k: v for k, v in chart_params.items() if k in ('x', 'y', 'hue')}
+            elif chart_type_str == "heatmap":
+                val_col = chart_params.get('z') or chart_params.get('values')
+                if not val_col:
+                    # 如果没有指定 values，计算频数
+                    pivot_data = pd.crosstab(df[chart_params.get('y')], df[chart_params.get('x')])
+                else:
+                    pivot_data = df.pivot_table(
+                        index=chart_params.get('y'),
+                        columns=chart_params.get('x'),
+                        values=val_col,
+                        aggfunc='mean'
+                    )
+                cmap = chart_params.get('palette', 'viridis')
+                sns.heatmap(pivot_data, ax=ax, cmap=cmap, alpha=chart_params.get('alpha', 1.0))
+            elif chart_type_str == "kdeplot":
+                kde_params = {k: v for k, v in chart_params.items() if k in ('x', 'y', 'hue', 'alpha')}
                 sns.kdeplot(data=df, ax=ax, fill=True, **kde_params)
-            elif chart_type == ChartType.regplot:
+            elif chart_type_str == "regplot":
                 reg_params = {k: v for k, v in chart_params.items() if k in ('x', 'y')}
-                sns.regplot(data=df, ax=ax, **reg_params)
-            elif chart_type == ChartType.countplot:
-                cnt_params = {k: v for k, v in chart_params.items() if k in ('x', 'y', 'hue')}
+                scatter_kws = {'alpha': chart_params.get('alpha', 1.0)}
+                sns.regplot(data=df, ax=ax, scatter_kws=scatter_kws, **reg_params)
+            elif chart_type_str == "countplot":
+                cnt_params = {k: v for k, v in chart_params.items() if k in ('x', 'y', 'hue', 'alpha')}
+                # countplot 不能同时拥有 x 和 y，剥离 y 如果 x 存在
+                if 'x' in cnt_params and 'y' in cnt_params:
+                    cnt_params.pop('y')
                 sns.countplot(data=df, ax=ax, **cnt_params)
-            elif chart_type == ChartType.rugplot:
-                rug_params = {k: v for k, v in chart_params.items() if k in ('x', 'y', 'hue')}
+            elif chart_type_str == "rugplot":
+                rug_params = {k: v for k, v in chart_params.items() if k in ('x', 'y', 'hue', 'alpha')}
                 sns.rugplot(data=df, ax=ax, **rug_params)
             else:
                 raise ValueError(f"不支持的 Seaborn 图表类型: {chart_type}")
 
+            # 双 Y 轴逻辑 (ax.twinx())
+            if secondary_y_col and secondary_y_col in df.columns and chart_type_str in ["scatter", "line", "bar"]:
+                ax2 = ax.twinx()
+                twin_params = chart_params.copy()
+                twin_params['y'] = secondary_y_col
+                
+                # 绘制辅助Y轴图形（用不冲突的颜色，避免颜色冲突）
+                if 'palette' in twin_params:
+                    del twin_params['palette']
+                if 'hue' in twin_params:
+                    del twin_params['hue']
+
+                if chart_type_str == "line":
+                    sns.lineplot(data=df, ax=ax2, color='coral', linestyle='--', linewidth=2, **twin_params)
+                elif chart_type_str == "bar":
+                    sns.barplot(data=df, ax=ax2, color='teal', alpha=0.4, **twin_params)
+                elif chart_type_str == "scatter":
+                    sns.scatterplot(data=df, ax=ax2, color='coral', marker='D', s=80, **twin_params)
+                
+                ax2.set_ylabel(secondary_y_col, color='coral' if chart_type_str != "bar" else 'teal')
+                ax2.tick_params(axis='y', labelcolor='coral' if chart_type_str != "bar" else 'teal')
+
+            # 处理双Y轴 (Secondary Y)
+            secondary_y_col = style_params.get('secondary_y')
+            if secondary_y_col and secondary_y_col in df.columns:
+                ax2 = ax.twinx()
+                sns.lineplot(data=df, x=chart_params.get('x'), y=secondary_y_col, ax=ax2, color='r', alpha=chart_params.get('alpha', 1.0))
+                ax2.set_ylabel(secondary_y_col)
+
             # 应用标题
             chart_title = style_params.get('title')
             if chart_title:
-                ax.set_title(chart_title, color='#F1F5F9')
+                ax.set_title(chart_title, color=plt.rcParams['text.color'])
+
+            # 图例显示逻辑
+            if not style_params.get('show_legend', True):
+                try:
+                    ax.get_legend().remove()
+                except Exception:
+                    pass
 
             if not style_params.get('show_grid', True):
                 ax.grid(False)
@@ -361,7 +477,7 @@ class ChartService:
         # 转换为 base64
         buf = io.BytesIO()
         fig.savefig(buf, format='png', dpi=150, bbox_inches='tight',
-                   facecolor='#1B1D2A', edgecolor='none')
+                   facecolor=face_color, edgecolor='none')
         buf.seek(0)
         img_base64 = base64.b64encode(buf.read()).decode()
         plt.close(fig)

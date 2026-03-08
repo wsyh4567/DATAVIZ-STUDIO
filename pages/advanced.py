@@ -10,6 +10,7 @@ from dash import html, dcc, callback, Input, Output, State, ctx, no_update
 import dash_bootstrap_components as dbc
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 from core.data_manager import DataManager
 
@@ -25,7 +26,7 @@ def create_advanced_page() -> html.Div:
                 className="dvs-empty",
                 style={"minHeight": "60vh"},
                 children=[
-                    html.Div("⚡", className="dvs-empty__icon"),
+                    html.I(className="bi bi-lightning dvs-empty__icon"),
                     html.Div("高级工具", className="dvs-empty__text"),
                     html.Div("请先在数据中心加载数据集", style={
                         "color": "var(--text-muted)", "fontSize": "var(--text-sm)"
@@ -58,36 +59,131 @@ def create_advanced_page() -> html.Div:
 
         # 工具选择
         dbc.Tabs([
-            # ─── 透视表 ──────────────────────────────
-            dbc.Tab(label="透视表", tab_id="tab-pivot", children=[
+            # ─── 导出全流程代码 ────────────────────────
+            dbc.Tab(label="🚀 提取 Python 分析流水线", tab_id="tab-export-pipeline", children=[
                 dbc.Card([
                     dbc.CardBody([
-                        html.P("将长格式数据重组为宽格式交叉表", className="text-muted mb-3"),
+                        html.H5("生成端到端数据分析 Python 脚本", className="mb-3", style={"color": "var(--accent)"}),
+                        html.P("此功能将为您自动生成一段包含数据加载、清洗变换结构与 Plotly Express 可视化脚手架的 Python 原生代码。您可以直接在本地 Jupyter 或 IDE 中运行，实现工业级分析闭环。", className="text-muted mb-4"),
+                        
+                        dbc.Button(
+                            [html.I(className="bi bi-file-earmark-code me-2"), "一键生成 Python 代码"], 
+                            id="btn-generate-pipeline", 
+                            color="success", 
+                            className="btn-hover mb-3"
+                        ),
+                        
+                        html.Div(id="pipeline-code-container", style={"display": "none"}, children=[
+                            dcc.Textarea(
+                                id='pipeline-code-display',
+                                value="",
+                                style={'width': '100%', 'height': '400px', 'fontFamily': 'monospace', 'backgroundColor': '#f8f9fa'},
+                                readOnly=True
+                            ),
+                            html.Div([
+                                dbc.Button(
+                                    [html.I(className="bi bi-filetype-py me-2"), "纯脚本 (.py)"], 
+                                    id="btn-download-pipeline-py", 
+                                    color="primary",
+                                    className="me-2 mt-2 btn-hover"
+                                ),
+                                dbc.Button(
+                                    [html.I(className="bi bi-journal-code me-2"), "互动笔记 (.ipynb)"], 
+                                    id="btn-download-pipeline-ipynb", 
+                                    color="info",
+                                    className="mt-2 btn-hover text-white"
+                                ),
+                            ], className="d-flex gx-2"),
+                            dcc.Download(id="download-pipeline-py-file"),
+                            dcc.Download(id="download-pipeline-ipynb-file")
+                        ])
+                    ])
+                ], className="mt-3 card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
+            ]),
+
+            # ─── 透视表（增强版）────────────────────────
+            dbc.Tab(label="📊 透视表", tab_id="tab-pivot", children=[
+                dbc.Card([
+                    dbc.CardBody([
+                        html.P("将长格式数据重组为宽格式交叉表，支持过滤条件、小计和排序", className="text-muted mb-3"),
+
+                        # ── 基本配置 ──────────────────────────────
+                        html.Div("基本配置", style={"fontWeight": "600", "fontSize": "0.85rem",
+                                                  "color": "#FF6B35", "marginBottom": "8px",
+                                                  "borderBottom": "1px solid #FFE4D9", "paddingBottom": "4px"}),
                         dbc.Row([
                             dbc.Col([
-                                html.Label("行索引", className="form-label"),
-                                dcc.Dropdown(id='adv-pivot-index', options=col_options, placeholder="选择行索引列"),
+                                html.Label("行索引（可多选）", className="form-label"),
+                                dcc.Dropdown(id='adv-pivot-index', options=col_options,
+                                             placeholder="选择行索引列", multi=True),
                             ], width=3),
                             dbc.Col([
-                                html.Label("列头", className="form-label"),
-                                dcc.Dropdown(id='adv-pivot-columns', options=col_options, placeholder="选择列头字段"),
+                                html.Label("列头字段", className="form-label"),
+                                dcc.Dropdown(id='adv-pivot-columns', options=col_options,
+                                             placeholder="选择列头字段"),
                             ], width=3),
                             dbc.Col([
-                                html.Label("值", className="form-label"),
-                                dcc.Dropdown(id='adv-pivot-values', options=num_options, placeholder="选择值字段"),
+                                html.Label("值字段（可多选）", className="form-label"),
+                                dcc.Dropdown(id='adv-pivot-values', options=num_options,
+                                             placeholder="选择值字段", multi=True),
                             ], width=3),
                             dbc.Col([
                                 html.Label("聚合函数", className="form-label"),
                                 dcc.Dropdown(id='adv-pivot-aggfunc', options=[
-                                    {'label': '均值', 'value': 'mean'},
-                                    {'label': '求和', 'value': 'sum'},
-                                    {'label': '计数', 'value': 'count'},
-                                    {'label': '最大', 'value': 'max'},
-                                    {'label': '最小', 'value': 'min'},
+                                    {'label': '均值 (mean)', 'value': 'mean'},
+                                    {'label': '求和 (sum)', 'value': 'sum'},
+                                    {'label': '计数 (count)', 'value': 'count'},
+                                    {'label': '最大 (max)', 'value': 'max'},
+                                    {'label': '最小 (min)', 'value': 'min'},
+                                    {'label': '中位数 (median)', 'value': 'median'},
+                                    {'label': '标准差 (std)', 'value': 'std'},
+                                    {'label': '方差 (var)', 'value': 'var'},
+                                    {'label': '去重计数 (nunique)', 'value': 'nunique'},
                                 ], value='mean', clearable=False),
                             ], width=3),
                         ], className="mb-3"),
-                        dbc.Button("执行透视", id="btn-run-pivot", color="primary", className="btn-hover"),
+
+                        # ── 附加选项 ──────────────────────────────
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Checklist(
+                                    id='adv-pivot-margins',
+                                    options=[{'label': ' 显示小计/总计行', 'value': 'margins'}],
+                                    value=[],
+                                    inline=True,
+                                ),
+                            ], width=3),
+                            dbc.Col([
+                                html.Label("透视后排序", className="form-label"),
+                                dcc.Dropdown(id='adv-pivot-sort', options=[
+                                    {'label': '不排序', 'value': 'none'},
+                                    {'label': '按行索引升序', 'value': 'index_asc'},
+                                    {'label': '按行索引降序', 'value': 'index_desc'},
+                                    {'label': '按第一列值降序', 'value': 'val_desc'},
+                                ], value='none', clearable=False),
+                            ], width=4),
+                        ], className="mb-3"),
+
+                        # ── 过滤条件 ──────────────────────────────
+                        html.Div("过滤条件（在透视前对原始数据过滤，AND 逻辑）",
+                                 style={"fontWeight": "600", "fontSize": "0.85rem",
+                                        "color": "#805AD5", "marginBottom": "8px",
+                                        "borderBottom": "1px solid #E9D8FD", "paddingBottom": "4px"}),
+                        html.Div(id='pivot-filter-rows', children=[
+                            _pivot_filter_row(0, col_options),
+                        ]),
+                        dbc.Button([html.I(className="bi bi-plus me-1"), "添加过滤条件"],
+                                   id='btn-add-pivot-filter', size='sm', color='link',
+                                   className='mb-3 ps-0'),
+                        dcc.Store(id='pivot-filter-count', data=1),
+
+                        html.Hr(className="my-2"),
+                        dbc.Button([html.I(className="bi bi-play-fill me-2"), "执行透视"],
+                                   id="btn-run-pivot", color="primary", className="btn-hover me-2"),
+                        dbc.Button([html.I(className="bi bi-download me-2"), "导出结果"],
+                                   id="btn-export-pivot", color="outline-secondary",
+                                   className="btn-hover", disabled=True),
+                        dcc.Download(id="download-pivot-file"),
                         html.Div(id="pivot-result", className="mt-3"),
                     ])
                 ], className="mt-3 card-hover", style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)"})
@@ -227,8 +323,68 @@ def create_advanced_page() -> html.Div:
 
 
 # ============================================================================
+# 辅助函数
+# ============================================================================
+
+def _pivot_filter_row(index: int, col_options: list) -> dbc.Row:
+    """生成一行过滤条件 UI"""
+    return dbc.Row([
+        dbc.Col(dcc.Dropdown(
+            id={'type': 'pivot-filter-col', 'index': index},
+            options=col_options, placeholder="列名"
+        ), width=4),
+        dbc.Col(dcc.Dropdown(
+            id={'type': 'pivot-filter-op', 'index': index},
+            options=[
+                {'label': '等于 (==)', 'value': '=='},
+                {'label': '不等于 (!=)', 'value': '!='},
+                {'label': '大于 (>)', 'value': '>'},
+                {'label': '小于 (<)', 'value': '<'},
+                {'label': '包含文本 (contains)', 'value': 'contains'},
+            ], value='=='
+        ), width=3),
+        dbc.Col(dbc.Input(
+            id={'type': 'pivot-filter-val', 'index': index},
+            type="text", placeholder="值"
+        ), width=4),
+        dbc.Col(
+            dbc.Button(html.I(className="bi bi-trash"), id={'type': 'pivot-filter-del', 'index': index},
+                       color="danger", size="sm", outline=True) if index > 0 else None,
+            width=1, className="d-flex align-items-center"
+        )
+    ], className="mb-2", id={'type': 'pivot-filter-row-container', 'index': index})
+
+# ============================================================================
 # 回调
 # ============================================================================
+
+from dash import MATCH, ALL
+
+@callback(
+    Output('pivot-filter-rows', 'children'),
+    Output('pivot-filter-count', 'data'),
+    Input('btn-add-pivot-filter', 'n_clicks'),
+    Input({'type': 'pivot-filter-del', 'index': ALL}, 'n_clicks'),
+    State('pivot-filter-rows', 'children'),
+    State('pivot-filter-count', 'data'),
+    prevent_initial_call=True
+)
+def manage_pivot_filters(add_clicks, del_clicks, current_children, current_count):
+    ctx_trigger = ctx.triggered_id
+    dm = DataManager()
+    col_options = [{'label': c, 'value': c} for c in dm.active_df.columns] if dm.active_df is not None else []
+
+    if ctx_trigger == 'btn-add-pivot-filter':
+        current_children.append(_pivot_filter_row(current_count, col_options))
+        return current_children, current_count + 1
+        
+    elif isinstance(ctx_trigger, dict) and ctx_trigger['type'] == 'pivot-filter-del':
+        idx_to_remove = ctx_trigger['index']
+        current_children = [c for c in current_children if c['props']['id']['index'] != idx_to_remove]
+        return current_children, current_count
+
+    return current_children, current_count
+
 
 # 右表变更时刷新右表键列选项
 @callback(
@@ -255,26 +411,96 @@ def update_right_columns(right_name):
     State('adv-pivot-columns', 'value'),
     State('adv-pivot-values', 'value'),
     State('adv-pivot-aggfunc', 'value'),
+    State('adv-pivot-margins', 'value'),
+    State('adv-pivot-sort', 'value'),
+    State({'type': 'pivot-filter-col', 'index': ALL}, 'value'),
+    State({'type': 'pivot-filter-op', 'index': ALL}, 'value'),
+    State({'type': 'pivot-filter-val', 'index': ALL}, 'value'),
     prevent_initial_call=True
 )
-def run_pivot(n, index, columns, values, aggfunc):
-    if not all([index, columns, values]):
-        return dbc.Alert("请填写所有必填参数", color="warning")
+def run_pivot(n, index, columns, values, aggfunc, margins_val, sort_col, f_cols, f_ops, f_vals):
+    if not index and not columns:
+         return dbc.Alert("必须至少指定行索引或列头之一", color="warning")
+    if not values:
+         return dbc.Alert("必须指定至少一个值列", color="warning")
+         
     dm = DataManager()
-    df = dm.active_df
+    df = dm.active_df.copy()
+    
     try:
-        result = df.pivot_table(index=index, columns=columns, values=values, aggfunc=aggfunc)
+        # 1. 应用过滤条件
+        for col, op, val in zip(f_cols, f_ops, f_vals):
+            if col and val:
+                # 尝试自动类型转换
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    try: val = float(val)
+                    except: pass
+                    
+                if op == '==': df = df[df[col] == val]
+                elif op == '!=': df = df[df[col] != val]
+                elif op == '>': df = df[df[col] > val]
+                elif op == '<': df = df[df[col] < val]
+                elif op == 'contains': df = df[df[col].astype(str).str.contains(str(val), case=False, na=False)]
+
+        if df.empty:
+            return dbc.Alert("过滤后的数据为空，无法生成透视表", color="warning")
+
+        # 2. 生成透视表
+        margins = bool(margins_val and 'margins' in margins_val)
+        
+        result = df.pivot_table(
+            index=index, 
+            columns=columns, 
+            values=values, 
+            aggfunc=aggfunc,
+            margins=margins,
+            margins_name="总计"
+        )
+        
+        # 3. 排序 (多级索引需要展平后再排比较方便展示)
+        if isinstance(result.columns, pd.MultiIndex):
+            # 将多级列名展平，例如 ('sales', '2023') -> 'sales_2023'
+            result.columns = ['_'.join(str(c) for c in col).strip() for col in result.columns.values]
+        else:
+            result.columns = [str(c) for c in result.columns]
+            
         result_flat = result.reset_index()
-        result_flat.columns = [str(c) for c in result_flat.columns]
+        
+        # 应用排序
+        if sort_col != 'none' and not result_flat.empty:
+             # 如果有总计行，先分开
+             total_row = None
+             if margins:
+                  idx_col = index[0] if isinstance(index, list) and index else (index if index else None)
+                  if idx_col and "总计" in result_flat[idx_col].values:
+                       total_row = result_flat[result_flat[idx_col] == "总计"]
+                       result_flat = result_flat[result_flat[idx_col] != "总计"]
+
+             if sort_col == 'index_asc':
+                  result_flat = result_flat.sort_values(by=result_flat.columns[0], ascending=True)
+             elif sort_col == 'index_desc':
+                  result_flat = result_flat.sort_values(by=result_flat.columns[0], ascending=False)
+             elif sort_col == 'val_desc':
+                  # 使用除索引外的第一列进行降序（通常是用户最关心的第一个数值列）
+                  val_cols = [c for c in result_flat.columns if c not in (index if isinstance(index, list) else [index])]
+                  if val_cols:
+                      result_flat = result_flat.sort_values(by=val_cols[0], ascending=False)
+                      
+             if total_row is not None:
+                  result_flat = pd.concat([result_flat, total_row], ignore_index=True)
 
         # 保存结果
-        dm.add_dataset(f"pivot_{index}_{columns}", result_flat, source="advanced:pivot")
+        idx_name = "_".join(index) if isinstance(index, list) else index
+        dm.add_dataset(f"pivot_{idx_name}", result_flat, source="advanced:pivot")
 
         return html.Div([
             dbc.Alert(f"透视完成: {result_flat.shape[0]} 行 × {result_flat.shape[1]} 列（已保存为新数据集）", color="success"),
-            dbc.Table.from_dataframe(result_flat.head(50), striped=True, bordered=True, hover=True, size='sm'),
+            dbc.Table.from_dataframe(result_flat.head(100), striped=True, bordered=True, hover=True, size='sm'),
+            html.Div(f"仅显示前 100 行", className="text-muted text-end small") if len(result_flat) > 100 else None
         ])
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return dbc.Alert(f"透视失败: {e}", color="danger")
 
 
@@ -416,3 +642,231 @@ def run_concat(n, dataset_names, ignore_index):
         ])
     except Exception as e:
         return dbc.Alert(f"拼接失败: {e}", color="danger")
+
+# ── 导出 Python 流水线 ──────────────────────────────────────
+
+@callback(
+    [Output('pipeline-code-container', 'style'),
+     Output('pipeline-code-display', 'value')],
+    Input('btn-generate-pipeline', 'n_clicks'),
+    prevent_initial_call=True
+)
+def generate_pipeline_code(n_clicks):
+    if not n_clicks:
+        return no_update
+        
+    dm = DataManager()
+    df = dm.active_df
+    meta = dm.get_meta()
+    
+    if df is None:
+         return {'display': 'block'}, "# 错误：没有加载数据集，请先前往数据中心加载数据。"
+         
+    cols_str = ", ".join([f"'{c}'" for c in df.columns[:5]]) + ("..." if len(df.columns) > 5 else "")
+    
+    code = f"""# ============================================================================
+# DataViz Studio 自动生成 - 端到端数据处理与分析流水线
+# 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+# 数据集当前状态: {meta.name if meta else 'unknown'} ({len(df)} 行, {len(df.columns)} 列)
+# ============================================================================
+
+import pandas as pd
+import numpy as np
+import plotly.express as px
+
+def run_pipeline(file_path):
+    # -------------------------------------------------------------------------
+    # 1. 加载数据
+    # -------------------------------------------------------------------------
+    print(f"Loading data from {{file_path}}...")
+    try:
+        df = pd.read_csv(file_path)
+    except Exception as e:
+        print(f"Error loading file: {{e}}")
+        return None
+        
+    # -------------------------------------------------------------------------
+    # 2. 定制化数据清洗与形态变换
+    # -------------------------------------------------------------------------
+    # 您当前数据集记录的重点关注列包含:
+    # {cols_str}
+    
+    # [在此处补充您的自定义数据规整代码，例如缺失值填补或重命名]
+    # 例: df.dropna(inplace=True)
+    # 例: df.fillna(0, inplace=True)
+    
+    # -------------------------------------------------------------------------
+    # 3. 核心可视化出图
+    # -------------------------------------------------------------------------
+"""
+    # 增加一个通用绘图例子
+    num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    if len(num_cols) >= 2:
+        code += f"""    # 生成核心分布散点图示例
+    fig = px.scatter(
+        df, 
+        x='{num_cols[0]}', 
+        y='{num_cols[1]}',
+        title='数据核心特征探索 - {meta.name if meta else ""}',
+        template='plotly_white'
+    )
+    # fig.show()
+    # fig.write_html('dataviz_output.html')
+"""
+    else:
+        code += """    # 记录的数据不具备两项以上数值列，在此仅打印数据头部
+    print(df.head())
+"""
+
+    code += """
+    return df
+
+if __name__ == "__main__":
+    # 请替换为真实的分析数据文件路径 (如 ./data.csv)
+    final_df = run_pipeline("your_dataset_path.csv")
+    if final_df is not None:
+        print("DataViz Pipeline executed successfully!")
+"""
+    return {'display': 'block'}, code
+
+
+@callback(
+    Output('download-pipeline-py-file', 'data'),
+    Input('btn-download-pipeline-py', 'n_clicks'),
+    State('pipeline-code-display', 'value'),
+    prevent_initial_call=True
+)
+def download_pipeline_py(n_clicks, code):
+    if not code:
+        return no_update
+    return dcc.send_string(code, filename=f"dataviz_pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py")
+
+import json
+
+@callback(
+    Output('download-pipeline-ipynb-file', 'data'),
+    Input('btn-download-pipeline-ipynb', 'n_clicks'),
+    prevent_initial_call=True
+)
+def download_pipeline_ipynb(n_clicks):
+    dm = DataManager()
+    df = dm.active_df
+    meta = dm.get_meta()
+    
+    if df is None:
+        return no_update
+        
+    cols_str = ", ".join([f"'{c}'" for c in df.columns[:5]]) + ("..." if len(df.columns) > 5 else "")
+    
+    cells = []
+    
+    # 1. 标题 Markdown
+    cells.append({
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            f"# DataViz Studio 自动生成 - 数据分析工程\n",
+            f"**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
+            f"**数据集**: {meta.name if meta else 'unknown'} ({len(df)} 行, {len(df.columns)} 列)"
+        ]
+    })
+    
+    # 2. 引入包
+    cells.append({
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "import pandas as pd\n",
+            "import numpy as np\n",
+            "import plotly.express as px\n"
+        ]
+    })
+    
+    # 3. 加载与简要探查数据
+    cells.append({
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# 1. 加载数据\n",
+            "file_path = 'your_dataset_path.csv'\n",
+            "try:\n",
+            "    df = pd.read_csv(file_path)\n",
+            "    print(f\"数据加载成功，形状: {df.shape}\")\n",
+            "    display(df.head())\n",
+            "except Exception as e:\n",
+            "    print(f\"找不到文件或加载失败请修改路径: {e}\")"
+        ]
+    })
+    
+    # 4. 数据清洗注释
+    cells.append({
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# 2. 定制化数据清洗与形态变换\n",
+            f"# 当前记录重点探索列包含: {cols_str}\n\n",
+            "# 例: df.dropna(inplace=True)\n",
+            "# 例: df.fillna(0, inplace=True)\n"
+        ]
+    })
+    
+    # 5. 可视化
+    num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    if len(num_cols) >= 2:
+        viz_source = [
+            "# 3. 核心可视化出图\n",
+            "fig = px.scatter(\n",
+            "    df, \n",
+            f"    x='{num_cols[0]}', \n",
+            f"    y='{num_cols[1]}',\n",
+            f"    title='数据核心特征探索 - {meta.name if meta else 'Dataset'}',\n",
+            "    template='plotly_white'\n",
+            ")\n",
+            "fig.show()\n"
+        ]
+    else:
+        viz_source = [
+            "# 3. 核心可视化出图\n",
+            "print(\"当前数据集中数值列不足两列，无法渲染二维散点图。您可以尝试其它可视化。\")"
+        ]
+        
+    cells.append({
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": viz_source
+    })
+    
+    notebook = {
+        "cells": cells,
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3"
+            },
+            "language_info": {
+                "codemirror_mode": {"name": "ipython", "version": 3},
+                "file_extension": ".py",
+                "mimetype": "text/x-python",
+                "name": "python",
+                "nbconvert_exporter": "python",
+                "pygments_lexer": "ipython3",
+                "version": "3.8.0"
+            }
+        },
+        "nbformat": 4,
+        "nbformat_minor": 4
+    }
+    
+    return dict(
+        content=json.dumps(notebook, ensure_ascii=False, indent=1),
+        filename=f"dataviz_pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ipynb"
+    )

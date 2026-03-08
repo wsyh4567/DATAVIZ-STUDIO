@@ -100,13 +100,28 @@ class OperationExecutor:
         elif operator == 'contains':
             case_sensitive = params.get('case_sensitive', True)
             result_df = df[df[column].str.contains(str(value), case=case_sensitive, na=False)].copy()
-            code = f"df = df[df['{column}'].str.contains({repr(value)}, case={case_sensitive}, na=False)]"
+            code = f"df = df[df['{column}'].astype(str).str.contains({repr(value)}, case={case_sensitive}, na=False)]"
+        elif operator == 'not_contains':
+            case_sensitive = params.get('case_sensitive', True)
+            result_df = df[~df[column].astype(str).str.contains(str(value), case=case_sensitive, na=False)].copy()
+            code = f"df = df[~df['{column}'].astype(str).str.contains({repr(value)}, case={case_sensitive}, na=False)]"
         elif operator == 'startswith':
             result_df = df[df[column].str.startswith(str(value), na=False)].copy()
-            code = f"df = df[df['{column}'].str.startswith({repr(value)}, na=False)]"
+            code = f"df = df[df['{column}'].astype(str).str.startswith({repr(value)}, na=False)]"
         elif operator == 'endswith':
             result_df = df[df[column].str.endswith(str(value), na=False)].copy()
-            code = f"df = df[df['{column}'].str.endswith({repr(value)}, na=False)]"
+            code = f"df = df[df['{column}'].astype(str).str.endswith({repr(value)}, na=False)]"
+        elif operator == 'isnull':
+            result_df = df[df[column].isnull()].copy()
+            code = f"df = df[df['{column}'].isnull()]"
+        elif operator == 'notnull':
+            result_df = df[df[column].notnull()].copy()
+            code = f"df = df[df['{column}'].notnull()]"
+        elif operator == 'isin':
+            if not isinstance(value, list):
+                value = [value]
+            result_df = df[df[column].astype(str).isin(value)].copy()
+            code = f"df = df[df['{column}'].astype(str).isin({repr(value)})]"
         else:
             raise ValueError(f"不支持的筛选操作符: {operator}")
 
