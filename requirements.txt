@@ -1,4 +1,4 @@
-dash>=2.14
+﻿dash>=2.14
 dash-bootstrap-components>=1.5
 dash-ag-grid>=31.0
 plotly>=5.18
@@ -8,3 +8,8 @@ openpyxl>=3.1
 chardet>=5.0
 seaborn>=0.12
 matplotlib>=3.7
+requests>=2.31
+scipy>=1.11
+scikit-learn>=1.4
+sqlalchemy>=2.0
+kaleido>=0.2.1

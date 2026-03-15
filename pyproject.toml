@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dataviz-studio"
 version = "0.1.0"
-description = "Free & open-source zero-code data analytics platform — Power BI / Tableau alternative"
+description = "Free & open-source zero-code data analytics platform - Power BI / Tableau alternative"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
@@ -31,17 +31,12 @@ dependencies = [
     "chardet>=5.0",
     "seaborn>=0.12",
     "matplotlib>=3.7",
+    "requests>=2.31",
+    "scipy>=1.11",
+    "scikit-learn>=1.4",
+    "sqlalchemy>=2.0",
+    "kaleido>=0.2.1",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "flake8",
-    "black",
-]
-
-[project.scripts]
-dataviz-studio = "cli:main"
-
-[tool.setuptools.packages.find]
-where = ["."]
+[tool.setuptools]
+packages = ["components", "core", "pages", "services", "tests"]

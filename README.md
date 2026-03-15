@@ -615,3 +615,10 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ---
 
 **Made with ❤️ by DataViz Studio Contributors**
+
+
+## Runtime Notes
+
+- Install with `pip install -r requirements.txt` to get the full app stack, including `requests`, `scipy`, `scikit-learn`, `sqlalchemy`, and `kaleido`.
+- `kaleido` is required for Plotly PNG/SVG export. If it is missing, HTML export still works.
+- `python app.py` is the primary startup command. `python cli.py` remains available when supported by your local environment.

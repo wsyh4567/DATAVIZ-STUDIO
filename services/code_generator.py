@@ -22,7 +22,7 @@ class CodeGenerator:
         """生成 Plotly 代码"""
         # 过滤掉样式参数，不要传入 px 函数
         style_keys = {'template', 'show_legend', 'show_grid', 'chart_width', 'chart_height',
-                       'color_scale', 'chart_title'}
+                       'color_scale', 'chart_title', 'title'}
         clean_params = {k: v for k, v in params.items() if k not in style_keys and v is not None}
 
         # 特殊图表需要 go 而非 px
@@ -94,7 +94,7 @@ class CodeGenerator:
                 lines.append(")")
 
         # 添加样式代码
-        title = params.get('chart_title')
+        title = params.get('title') or params.get('chart_title')
         template = params.get('template')
         if title or template:
             lines.append("")
@@ -127,7 +127,7 @@ class CodeGenerator:
         """生成 Seaborn 代码"""
         # 过滤掉样式参数和非 seaborn 参数
         style_keys = {'template', 'show_legend', 'show_grid', 'chart_width', 'chart_height',
-                       'color_scale', 'chart_title'}
+                       'color_scale', 'chart_title', 'title'}
         clean_params = {k: v for k, v in params.items()
                         if k not in style_keys and v is not None and k not in ['values']}
 
@@ -182,7 +182,7 @@ class CodeGenerator:
 
         lines.append("")
         lines.append("# 3. 设置标题和标签（可选）")
-        title = params.get('chart_title')
+        title = params.get('title') or params.get('chart_title')
         if title:
             if chart_type in multi_panel_types:
                 lines.append(f"g.fig.suptitle('{title}', y=1.02)")
