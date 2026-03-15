@@ -1992,9 +1992,9 @@
     font-family: 'JetBrains Mono', 'Consolas', monospace;
     font-size: 13px;
     line-height: 1.6;
-    background-color: #1e1e1e;
-    color: #d4d4d4;
-    border: 1px solid #333;
+    background-color: #FFFDFB;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 16px;
     resize: vertical;
@@ -2213,4 +2213,498 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* ============================================
+   Enhanced EDA - Light Theme
+   ============================================ */
+
+.eda-section-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: var(--sp-5);
+    margin-bottom: var(--sp-4);
+}
+
+.eda-section-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+}
+
+.eda-section-header__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--accent-light);
+    color: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.eda-section-header__title {
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+}
+
+.eda-section-header__subtitle {
+    margin-top: 2px;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.eda-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--sp-3);
+}
+
+.eda-metric-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+}
+
+.eda-metric-card__label {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: var(--sp-2);
+}
+
+.eda-metric-card__value {
+    color: var(--text-primary);
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+}
+
+.eda-summary-banner {
+    display: grid;
+    grid-template-columns: 1.3fr 0.7fr;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+}
+
+.eda-summary-banner__main,
+.eda-summary-banner__meta {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.05), rgba(255, 255, 255, 0.96));
+    border: 1px solid rgba(255, 107, 53, 0.12);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+}
+
+.eda-summary-banner__title {
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    color: var(--text-primary);
+    margin-bottom: var(--sp-2);
+}
+
+.eda-summary-banner__text {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.7;
+}
+
+.eda-summary-banner__meta {
+    display: grid;
+    gap: var(--sp-3);
+}
+
+.eda-summary-banner__kv-label {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    margin-bottom: 2px;
+}
+
+.eda-summary-banner__kv-value {
+    color: var(--text-primary);
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+}
+
+.eda-usecase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-3);
+}
+
+.eda-usecase-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+}
+
+.eda-usecase-card__eyebrow {
+    color: var(--accent-primary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: var(--sp-2);
+}
+
+.eda-usecase-card__title {
+    color: var(--text-primary);
+    font-size: var(--text-md);
+    font-weight: var(--font-semibold);
+    line-height: 1.5;
+    margin-bottom: var(--sp-2);
+}
+
+.eda-usecase-card__text,
+.eda-usecase-card__scene {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+}
+
+.eda-usecase-card__scene {
+    margin-top: var(--sp-3);
+    color: var(--text-muted);
+}
+
+.eda-readiness-grid,
+.eda-story-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
+}
+
+.eda-readiness-cards {
+    display: grid;
+    gap: var(--sp-3);
+}
+
+.eda-readiness-card {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+}
+
+.eda-readiness-card__label {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    margin-bottom: var(--sp-1);
+}
+
+.eda-readiness-card__value {
+    color: var(--text-primary);
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    margin-bottom: var(--sp-2);
+}
+
+.eda-readiness-card__text {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+}
+
+.eda-alert-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
+}
+
+.eda-alert-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+    background: #FFFDFB;
+}
+
+.eda-alert-card--warning {
+    border-left: 4px solid var(--warning);
+}
+
+.eda-alert-card--info {
+    border-left: 4px solid var(--info);
+}
+
+.eda-alert-card__title {
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--sp-2);
+}
+
+.eda-alert-card__message,
+.eda-alert-card__action,
+.eda-empty-card__text,
+.eda-relationship-list {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+}
+
+.eda-empty-card {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.04), rgba(255, 255, 255, 0.95));
+    border: 1px dashed rgba(255, 107, 53, 0.25);
+    border-radius: var(--radius-lg);
+    padding: var(--sp-6);
+}
+
+.eda-empty-card__title {
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--sp-2);
+}
+
+.eda-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-3);
+}
+
+.eda-chart-grid--wide {
+    grid-template-columns: 1.1fr 0.9fr;
+}
+
+.eda-chart-card,
+.eda-subsection-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-3);
+}
+
+.eda-profile-stack {
+    display: grid;
+    gap: var(--sp-3);
+}
+
+.eda-subsection-title {
+    font-size: var(--text-md);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--sp-3);
+}
+
+.eda-table-wrap {
+    overflow-x: auto;
+}
+
+.eda-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+}
+
+.eda-table th,
+.eda-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+
+.eda-table th {
+    color: var(--text-muted);
+    font-weight: var(--font-semibold);
+    background: rgba(255, 255, 255, 0.75);
+}
+
+.eda-relationship-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.eda-relationship-block + .eda-relationship-block {
+    margin-top: var(--sp-4);
+}
+
+.eda-sampling-modal .modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+}
+
+.eda-sampling-modal .modal-header,
+.eda-sampling-modal .modal-footer {
+    border-color: var(--border);
+}
+
+.eda-sampling-copy p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+@media (max-width: 1200px) {
+    .eda-summary-banner,
+    .eda-usecase-grid,
+    .eda-metric-grid,
+    .eda-readiness-grid,
+    .eda-story-grid,
+    .eda-chart-grid,
+    .eda-chart-grid--wide,
+    .eda-alert-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================
+   App Shell Overrides
+   Keep the navigation shell stable even if
+   earlier legacy comment blocks are malformed.
+   ============================================ */
+
+#app-root.dvs-app {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: var(--topbar-height) 1fr var(--statusbar-height);
+    grid-template-areas:
+        "sidebar topbar"
+        "sidebar content"
+        "sidebar status";
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+#app-root .dvs-topbar {
+    grid-area: topbar;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--sp-5) 0 var(--sp-4);
+    height: var(--topbar-height);
+    background: var(--glass-bg-strong);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(var(--glass-blur-strong));
+    -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+    position: relative;
+    z-index: 100;
+}
+
+#app-root .dvs-sidebar {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    width: var(--sidebar-width);
+    padding: var(--sp-3) 0;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    z-index: 110;
+}
+
+#app-root .dvs-sidebar--collapsed {
+    width: var(--sidebar-collapsed);
+}
+
+#app-root .dvs-content {
+    grid-area: content;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--sp-6);
+    background: var(--bg-primary);
+}
+
+#app-root .dvs-statusbar {
+    grid-area: status;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--statusbar-height);
+    padding: 0 var(--sp-4);
+    background: var(--glass-bg-strong);
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+}
+
+#app-root .dvs-topbar__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--text-primary);
+    font-size: 1.4rem;
+    font-weight: 700;
+    user-select: none;
+}
+
+#app-root .dvs-topbar__brand-accent {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#app-root .dvs-topbar__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+}
+
+#app-root .dvs-topbar__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#app-root .dvs-topbar__btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+#app-root .dvs-sidebar__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 3px 12px;
+    padding: 10px 20px;
+    height: 50px;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+#app-root .dvs-sidebar__item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+#app-root .dvs-sidebar__item--active {
+    background: rgba(255, 107, 53, 0.09);
+    color: var(--accent-primary);
+    font-weight: var(--font-semibold);
+}
+
+#app-root .dvs-sidebar__icon {
+    width: 32px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 1.4rem;
+}
+
+#app-root .dvs-sidebar__toggle {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-3);
+    color: var(--text-muted);
+    cursor: pointer;
 }

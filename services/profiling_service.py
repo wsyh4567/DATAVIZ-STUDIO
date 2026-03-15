@@ -230,7 +230,7 @@ class ProfilingService:
                 showlegend=False,
                 margin=dict(l=10, r=10, t=10, b=30),
                 height=max(150, len(freq) * 28),
-                template="plotly_dark",
+                template="plotly_white",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(size=10),

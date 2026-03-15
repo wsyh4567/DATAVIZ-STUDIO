@@ -1,115 +1,99 @@
-# -*- coding: utf-8 -*-
-"""DataViz Studio — 数据画布页（一体化版）
-
-AG Grid 高性能数据表格 + 数据概览 KPI 卡片 + 数据质量分析 + 分布图 + 相关性热力图 + 数据导出。
-（原仪表盘内容已合并至此页面）
-"""
+﻿# -*- coding: utf-8 -*-
+"""Data Canvas page with enhanced EDA workflow."""
 
 from __future__ import annotations
+
 import io
+from typing import Any, Dict, Iterable, List, Optional
 
-from dash import html, dcc, Input, Output, State, callback, no_update, ctx
 import dash_bootstrap_components as dbc
-import plotly.express as px
-import plotly.graph_objects as go
 import pandas as pd
-import numpy as np
+from dash import Input, Output, State, callback, ctx, dcc, html, no_update
 
-from core.data_manager import DataManager
 from components.data_table import create_data_table
+from core.data_manager import DataManager
+from services.eda_service import EDAService
+from services.report_generator import ReportGenerator
 from utils.helpers import format_number
 
 
-# ── 输入验证 ──────────────────────────────────────────────
-
-def validate_n_value(n_value):
-    """验证N值输入是否为有效的正整数。"""
-    if n_value is None or n_value == "":
-        return False, None, "请输入行数"
-    try:
-        n = int(n_value)
-        if n <= 0:
-            return False, None, "行数必须大于0"
-        if n != float(n_value):
-            return False, None, "行数必须是整数"
-        return True, n, None
-    except (ValueError, TypeError):
-        return False, None, "请输入有效的数字"
-
-
-# ── 颜色工具 ──────────────────────────────────────────────
-
-def _hex_to_rgba(hex_color: str) -> str:
-    h = hex_color.lstrip('#')
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f"{r},{g},{b}"
-
-
-# ── KPI 卡片图标映射 ──────────────────────────────────────
-
-_KPI_CONFIG = [
-    {
-        "key": "rows",
-        "label": "总行数",
-        "sub_key": "rows_sub",
-        "icon": "bi-table",
-        "color": "#3B82F6",
-    },
-    {
-        "key": "cols",
-        "label": "总列数",
-        "sub_key": "cols_sub",
-        "icon": "bi-layout-three-columns",
-        "color": "#8B5CF6",
-    },
-    {
-        "key": "missing",
-        "label": "缺失值",
-        "sub_key": "missing_sub",
-        "icon": "bi-exclamation-circle",
-        "color": "#F59E0B",
-    },
-    {
-        "key": "dup",
-        "label": "重复行",
-        "sub_key": "dup_sub",
-        "icon": "bi-files",
-        "color": "#EF4444",
-    },
-    {
-        "key": "memory",
-        "label": "内存占用",
-        "sub_key": "memory_sub",
-        "icon": "bi-cpu",
-        "color": "#6B7280",
-    },
-    {
-        "key": "quality",
-        "label": "数据健康度",
-        "sub_key": "quality_sub",
-        "icon": "bi-shield-check",
-        "color": "#10B981",
-    },
+KPI_CONFIG = [
+    {"label": "总行数", "icon": "bi-table", "color": "#3182CE"},
+    {"label": "总列数", "icon": "bi-layout-three-columns", "color": "#7C3AED"},
+    {"label": "缺失值", "icon": "bi-exclamation-circle", "color": "#DD6B20"},
+    {"label": "重复行", "icon": "bi-files", "color": "#E53E3E"},
+    {"label": "内存占用", "icon": "bi-cpu", "color": "#4A5568"},
+    {"label": "数据健康度", "icon": "bi-shield-check", "color": "#38A169"},
 ]
 
 
-# ── 页面布局 ──────────────────────────────────────────────
+def validate_n_value(n_value: Any) -> tuple[bool, Optional[int], Optional[str]]:
+    if n_value is None or n_value == "":
+        return False, None, "请输入有效的行数。"
+    try:
+        n = int(n_value)
+    except (TypeError, ValueError):
+        return False, None, "请输入有效的数字。"
+    if n <= 0:
+        return False, None, "行数必须大于 0。"
+    return True, n, None
+
+
+def _hex_to_rgba(hex_color: str) -> str:
+    color = hex_color.lstrip("#")
+    return f"{int(color[0:2], 16)},{int(color[2:4], 16)},{int(color[4:6], 16)}"
+
+
+def _dataset_key(name: Optional[str], df: Optional[pd.DataFrame]) -> str:
+    if df is None:
+        return "empty"
+    return f"{name or 'dataset'}::{len(df)}::{len(df.columns)}"
+
+
+def _resolve_preview(df: pd.DataFrame, n_value: Any) -> tuple[str, int, Optional[html.Div]]:
+    view_mode = "head"
+    if ctx.triggered_id == "btn-view-middle":
+        view_mode = "middle"
+    elif ctx.triggered_id == "btn-view-tail":
+        view_mode = "tail"
+    elif ctx.triggered_id == "btn-view-all":
+        view_mode = "all"
+
+    if view_mode == "all":
+        return view_mode, min(len(df), 10_000), None
+
+    valid, n_rows, error = validate_n_value(n_value)
+    if not valid:
+        warning = html.Div(
+            className="dvs-alert dvs-alert--warning",
+            children=[
+                html.Span("请输入有效的预览行数。" if error is None else error),
+            ],
+        )
+        return view_mode, 10, warning
+
+    if n_rows > len(df):
+        warning = html.Div(
+            className="dvs-alert dvs-alert--info",
+            children=[html.Span(f"请求的行数超过总行数，将显示全部可用数据。")],
+        )
+        return view_mode, len(df), warning
+
+    return view_mode, n_rows, None
+
 
 def create_data_canvas_page() -> html.Div:
-    """返回数据画布页面布局。"""
     return html.Div(
         children=[
+            dcc.Store(id="eda-analysis-mode", data="full"),
+            dcc.Store(id="eda-sample-size", data=None),
+            dcc.Store(id="eda-user-sampling-choice", data=None),
+            dcc.Store(id="eda-last-analysis-meta", data=None),
             html.H2("数据画布", className="dvs-page-title"),
-
-            # ── KPI 卡片行（带图标）
             html.Div(id="canvas-stats-row", className="dvs-stats-row stagger-container"),
-
-            # ── 数据预览控制区
             html.Div(
                 className="dvs-preview-control",
                 style={"marginBottom": "var(--sp-3)"},
-                role="region",
-                **{"aria-label": "数据预览控制"},
                 children=[
                     html.Div(
                         className="dvs-preview-control__header",
@@ -118,11 +102,15 @@ def create_data_canvas_page() -> html.Div:
                             html.Div(
                                 className="dvs-preview-control__n-input",
                                 children=[
-                                    html.Label("显示行数：", htmlFor="preview-n-value",
-                                               style={"marginRight": "var(--sp-2)", "color": "var(--text-secondary)"}),
+                                    html.Label("显示行数", htmlFor="preview-n-value", style={"marginRight": "var(--sp-2)", "color": "var(--text-secondary)"}),
                                     dcc.Input(
-                                        id="preview-n-value", type="number", value=10, min=1, step=1,
-                                        className="dvs-input dvs-input--sm", style={"width": "80px"},
+                                        id="preview-n-value",
+                                        type="number",
+                                        value=10,
+                                        min=1,
+                                        step=1,
+                                        className="dvs-input dvs-input--sm",
+                                        style={"width": "88px"},
                                     ),
                                 ],
                             ),
@@ -130,203 +118,230 @@ def create_data_canvas_page() -> html.Div:
                     ),
                     html.Div(
                         className="dvs-preview-control__buttons",
-                        style={"display": "flex", "gap": "var(--sp-2)", "marginTop": "var(--sp-2)"},
-                        role="group",
-                        **{"aria-label": "数据预览模式选择"},
                         children=[
-                            html.Button("前 N 行", id="btn-view-head",
-                                        className="dvs-btn dvs-btn--sm dvs-btn--primary btn-hover",
-                                        **{"aria-label": "显示前N行数据"}),
-                            html.Button("中间 N 行", id="btn-view-middle",
-                                        className="dvs-btn dvs-btn--sm btn-hover",
-                                        **{"aria-label": "显示中间N行数据"}),
-                            html.Button("后 N 行", id="btn-view-tail",
-                                        className="dvs-btn dvs-btn--sm btn-hover",
-                                        **{"aria-label": "显示后N行数据"}),
-                            html.Button("全部数据", id="btn-view-all",
-                                        className="dvs-btn dvs-btn--sm btn-hover",
-                                        **{"aria-label": "显示全部数据"}),
+                            html.Button("前 N 行", id="btn-view-head", className="dvs-btn dvs-btn--sm dvs-btn--primary btn-hover"),
+                            html.Button("中间 N 行", id="btn-view-middle", className="dvs-btn dvs-btn--sm btn-hover"),
+                            html.Button("后 N 行", id="btn-view-tail", className="dvs-btn dvs-btn--sm btn-hover"),
+                            html.Button("全部数据", id="btn-view-all", className="dvs-btn dvs-btn--sm btn-hover"),
                         ],
                     ),
-                    html.Div(id="preview-warning", className="dvs-preview-control__warning",
-                             style={"marginTop": "var(--sp-2)"}, role="alert", **{"aria-live": "polite"}),
+                    html.Div(id="preview-warning", className="dvs-preview-control__warning"),
                 ],
             ),
-
-            # ── AG Grid 表格
             html.Div(id="canvas-table-container"),
-
-            # ── 数据导出按钮行
             html.Div(
                 className="dvs-preview-control",
                 style={"marginTop": "var(--sp-3)", "display": "flex", "gap": "var(--sp-2)", "alignItems": "center"},
                 children=[
-                    html.Span("导出数据：", style={"color": "var(--text-secondary)", "marginRight": "var(--sp-2)"}),
+                    html.Span("导出数据", style={"color": "var(--text-secondary)", "marginRight": "var(--sp-2)"}),
                     html.Button("CSV", id="btn-export-csv", className="dvs-btn dvs-btn--sm btn-hover"),
                     html.Button("Excel", id="btn-export-excel", className="dvs-btn dvs-btn--sm btn-hover"),
                     html.Button("JSON", id="btn-export-json", className="dvs-btn dvs-btn--sm btn-hover"),
-                    html.Span("│", style={"color": "var(--border)", "margin": "0 var(--sp-2)"}),
-                    html.Button("📄 导出分析报告", id="btn-export-report",
-                                className="dvs-btn dvs-btn--sm dvs-btn--primary btn-hover"),
+                    html.Span("•", style={"color": "var(--border)", "margin": "0 var(--sp-2)"}),
+                    html.Button("导出分析报告", id="btn-export-report", className="dvs-btn dvs-btn--sm dvs-btn--primary btn-hover"),
                 ],
             ),
             dcc.Download(id="download-data-file"),
             dcc.Download(id="download-report-file"),
-
-            # ═══════════════════════════════════════════════════
-            # ── 数据洞察分析区（原仪表盘内容）
-            # ═══════════════════════════════════════════════════
+            dbc.Modal(
+                id="eda-sampling-modal",
+                is_open=False,
+                centered=True,
+                className="eda-sampling-modal",
+                children=[
+                    dbc.ModalHeader(dbc.ModalTitle("选择 EDA 分析模式"), close_button=False),
+                    dbc.ModalBody(id="eda-sampling-modal-body"),
+                    dbc.ModalFooter(
+                        children=[
+                            html.Button("本次取消", id="btn-eda-cancel", className="dvs-btn dvs-btn--sm"),
+                            html.Button("全量分析", id="btn-eda-use-full", className="dvs-btn dvs-btn--sm"),
+                            html.Button("推荐采样", id="btn-eda-use-sample", className="dvs-btn dvs-btn--sm dvs-btn--primary"),
+                        ],
+                    ),
+                ],
+            ),
             html.Div(id="canvas-insight-section"),
         ]
     )
 
-
-# ═══════════════════════════════════════════════════════════
-# ── Callbacks ───────────────────────────────────────────────
-# ═══════════════════════════════════════════════════════════
 
 @callback(
     Output("canvas-stats-row", "children"),
     Output("canvas-table-container", "children"),
     Output("preview-warning", "children"),
     Output("canvas-insight-section", "children"),
+    Output("eda-sampling-modal", "is_open"),
+    Output("eda-sampling-modal-body", "children"),
+    Output("eda-analysis-mode", "data"),
+    Output("eda-sample-size", "data"),
+    Output("eda-user-sampling-choice", "data"),
+    Output("eda-last-analysis-meta", "data"),
     Input("app-store", "data"),
     Input("btn-view-head", "n_clicks"),
     Input("btn-view-middle", "n_clicks"),
     Input("btn-view-tail", "n_clicks"),
     Input("btn-view-all", "n_clicks"),
+    Input("btn-eda-use-sample", "n_clicks"),
+    Input("btn-eda-use-full", "n_clicks"),
+    Input("btn-eda-cancel", "n_clicks"),
     State("preview-n-value", "value"),
-    State("canvas-table-container", "children"),
+    State("eda-analysis-mode", "data"),
+    State("eda-sample-size", "data"),
+    State("eda-user-sampling-choice", "data"),
+    State("eda-last-analysis-meta", "data"),
 )
-def update_canvas(store_data, n_head, n_middle, n_tail, n_all, n_value, current_table):
-    """当活跃数据集变化或预览模式改变时更新表格、KPI 卡片和洞察图表。"""
-    warning_msg = None
+def update_canvas(
+    store_data: Optional[dict],
+    n_head: Optional[int],
+    n_middle: Optional[int],
+    n_tail: Optional[int],
+    n_all: Optional[int],
+    n_sample: Optional[int],
+    n_full: Optional[int],
+    n_cancel: Optional[int],
+    n_value: Any,
+    current_mode: Optional[str],
+    current_sample_size: Optional[int],
+    sampling_choice: Optional[dict],
+    last_analysis_meta: Optional[dict],
+):
+    dm = DataManager()
+    df = dm.active_df
+    meta = dm.get_meta()
+    name = dm.active_name or "data"
 
-    try:
-        dm = DataManager()
-        meta = dm.get_meta()
-        df = dm.active_df
+    if df is None or meta is None:
+        empty = _empty_state("尚未加载数据", "前往数据中心或主页加载数据集。")
+        return [], empty, None, [], False, no_update, current_mode, current_sample_size, sampling_choice, last_analysis_meta
 
-        if df is None or meta is None:
-            empty = html.Div(
-                className="dvs-empty",
-                children=[
-                    html.Div("📭", className="dvs-empty__icon"),
-                    html.Div("尚未加载数据", className="dvs-empty__text"),
-                    html.Div("前往主页或数据中心加载数据集",
-                             style={"color": "var(--text-muted)", "fontSize": "var(--text-sm)"}),
-                ],
-            )
-            return [], empty, None, []
-    except Exception as e:
-        error = html.Div(
-            className="dvs-empty",
-            children=[
-                html.Div("⚠️", className="dvs-empty__icon"),
-                html.Div("数据加载出错", className="dvs-empty__text"),
-                html.Div(f"错误信息：{str(e)}", style={"color": "var(--error)", "fontSize": "var(--text-sm)"}),
-            ],
+    view_mode, n_rows, preview_warning = _resolve_preview(df, n_value)
+    table = create_data_table(df, view_mode=view_mode, n_rows=n_rows)
+    dataset_key = _dataset_key(name, df)
+    recommended_size = EDAService.recommended_sample_size(len(df))
+    should_prompt = EDAService.should_recommend_sampling(meta.rows, meta.memory_mb)
+
+    decision = None
+    if isinstance(sampling_choice, dict) and sampling_choice.get("dataset_key") == dataset_key:
+        decision = sampling_choice.get("decision")
+
+    trigger = ctx.triggered_id
+    modal_body = _build_sampling_modal_body(meta.rows, meta.memory_mb, recommended_size)
+    modal_open = False
+
+    if trigger == "btn-eda-use-sample":
+        decision = "sample"
+    elif trigger == "btn-eda-use-full":
+        decision = "full"
+    elif trigger == "btn-eda-cancel":
+        decision = "cancel"
+
+    if should_prompt and decision is None:
+        stats_cards = _build_stats_cards(meta, df)
+        pending_section = _sampling_pending_section(meta.rows, meta.memory_mb, recommended_size)
+        return (
+            stats_cards,
+            table,
+            preview_warning,
+            pending_section,
+            True,
+            modal_body,
+            current_mode or "full",
+            recommended_size,
+            {"dataset_key": dataset_key, "decision": None},
+            last_analysis_meta,
         )
-        return [], error, None, []
 
-    # ── 计算 KPI 数据 ──────────────────────────────────────
-    missing_total = int(df.isnull().sum().sum())
-    missing_pct = (missing_total / (meta.rows * meta.cols) * 100) if meta.rows * meta.cols > 0 else 0
-    dup_count = int(df.duplicated().sum())
-    dup_pct = (dup_count / meta.rows * 100) if meta.rows > 0 else 0
+    if should_prompt and decision == "cancel":
+        stats_cards = _build_stats_cards(meta, df)
+        cancelled_section = _sampling_cancelled_section()
+        return (
+            stats_cards,
+            table,
+            preview_warning,
+            cancelled_section,
+            False,
+            modal_body,
+            current_mode or "full",
+            recommended_size,
+            {"dataset_key": dataset_key, "decision": "cancel"},
+            last_analysis_meta,
+        )
 
-    # 数据质量分数（简化计算）
-    quality_score = max(0, 100 - int(missing_pct * 0.6) - min(20, int(dup_pct * 0.4)))
-    quality_color = "#10B981" if quality_score >= 80 else "#F59E0B" if quality_score >= 60 else "#EF4444"
+    analysis_mode = "sample" if should_prompt and decision == "sample" else "full"
+    sample_size = recommended_size if analysis_mode == "sample" else None
+    report = EDAService.analyze_dataset(df, mode=analysis_mode, sample_size=sample_size)
+    stats_cards = _build_stats_cards(meta, df, report)
+    insight_section = _build_insight_section(df, report)
+    new_last_meta = {**report["sample_meta"], "dataset_key": dataset_key}
 
-    # ── 带图标的 KPI 卡片 ──────────────────────────────────
-    stats_cards = [
-        _icon_stat_card("总行数", format_number(meta.rows), f"{meta.rows:,} 条记录",
-                        "bi-table", "#3B82F6"),
-        _icon_stat_card("总列数", str(meta.cols), f"{meta.cols} 个特征字段",
-                        "bi-layout-three-columns", "#8B5CF6"),
-        _icon_stat_card("缺失值", format_number(missing_total), f"占比 {missing_pct:.1f}%",
-                        "bi-exclamation-circle",
-                        "#F59E0B" if missing_total > 0 else "#10B981"),
-        _icon_stat_card("重复行", format_number(dup_count), f"占比 {dup_pct:.1f}%",
-                        "bi-files",
-                        "#EF4444" if dup_count > 0 else "#10B981"),
-        _icon_stat_card("内存占用", f"{meta.memory_mb:.1f} MB", "当前数据集",
-                        "bi-cpu", "#6B7280"),
-        _icon_stat_card("数据健康度", f"{quality_score}/100", "综合质量评分",
-                        "bi-shield-check", quality_color),
+    return (
+        stats_cards,
+        table,
+        preview_warning,
+        insight_section,
+        False,
+        modal_body,
+        report["sample_meta"]["mode"],
+        recommended_size,
+        {"dataset_key": dataset_key, "decision": analysis_mode},
+        new_last_meta,
+    )
+
+
+def _build_stats_cards(meta: Any, df: pd.DataFrame, report: Optional[Dict[str, Any]] = None) -> List[html.Div]:
+    missing_total = int(df.isna().sum().sum())
+    duplicate_count = int(df.duplicated().sum())
+    if report is None:
+        missing_pct = missing_total / max(meta.rows * meta.cols, 1) * 100
+        duplicate_pct = duplicate_count / max(meta.rows, 1) * 100
+        quality_score = max(0, 100 - int(missing_pct * 0.6) - min(20, int(duplicate_pct * 0.4)))
+    else:
+        missing_pct = report["overview"]["missing_pct"]
+        duplicate_pct = report["overview"]["duplicate_pct"]
+        quality_score = report["overview"]["quality_score"]
+    quality_color = "#38A169" if quality_score >= 80 else "#DD6B20" if quality_score >= 60 else "#E53E3E"
+
+    values = [
+        ("总行数", format_number(meta.rows), f"{meta.rows:,} 条记录", "bi-table", "#3182CE"),
+        ("总列数", str(meta.cols), f"{meta.cols} 个字段", "bi-layout-three-columns", "#7C3AED"),
+        ("缺失值", format_number(missing_total), f"占比 {missing_pct:.1f}%", "bi-exclamation-circle", "#DD6B20" if missing_total else "#38A169"),
+        ("重复行", format_number(duplicate_count), f"占比 {duplicate_pct:.1f}%", "bi-files", "#E53E3E" if duplicate_count else "#38A169"),
+        ("内存占用", f"{meta.memory_mb:.1f} MB", "当前数据集", "bi-cpu", "#4A5568"),
+        ("数据健康度", f"{quality_score:.1f}", "综合质量评分", "bi-shield-check", quality_color),
     ]
+    return [_icon_stat_card(*item) for item in values]
 
-    # ── 表格预览 ──────────────────────────────────────────
-    view_mode = "head"
-    if ctx.triggered_id == "btn-view-middle":
-        view_mode = "middle"
-    elif ctx.triggered_id == "btn-view-tail":
-        view_mode = "tail"
-    elif ctx.triggered_id == "btn-view-all":
-        view_mode = "all"
-    elif ctx.triggered_id == "btn-view-head":
-        view_mode = "head"
-
-    n = 10
-    if view_mode != "all":
-        is_valid, validated_n, error_msg = validate_n_value(n_value)
-        if not is_valid:
-            warning_msg = html.Div(
-                className="dvs-alert dvs-alert--warning",
-                children=[
-                    html.Span("⚠️ ", style={"marginRight": "var(--sp-2)"}),
-                    html.Span(error_msg or "无效的行数输入"),
-                ],
-            )
-            n = 10
-        else:
-            n = validated_n
-            if n > meta.rows:
-                warning_msg = html.Div(
-                    className="dvs-alert dvs-alert--info",
-                    children=[
-                        html.Span("ℹ️ ", style={"marginRight": "var(--sp-2)"}),
-                        html.Span(f"请求的行数 ({n:,}) 超过总行数 ({meta.rows:,})，将显示所有可用数据"),
-                    ],
-                )
-
-    table = create_data_table(df, view_mode=view_mode, n_rows=n)
-
-    # ── 洞察分析区（仪表盘内容）──────────────────────────
-    insight_section = _build_insight_section(df)
-
-    return stats_cards, table, warning_msg, insight_section
-
-
-# ── KPI 卡片（带图标）────────────────────────────────────
 
 def _icon_stat_card(label: str, value: str, sub: str, icon: str, color: str) -> html.Div:
-    """带 Bootstrap Icon 的商业风格 KPI 卡片。"""
     return html.Div(
         className="dvs-stat-card card-hover stagger-item",
-        style={
-            "borderLeft": f"3px solid {color}",
-            "position": "relative",
-            "overflow": "hidden",
-        },
+        style={"borderLeft": f"3px solid {color}", "position": "relative", "overflow": "hidden"},
         children=[
-            # 背景装饰
-            html.Div(style={
-                "position": "absolute", "right": "-8px", "top": "-8px",
-                "width": "60px", "height": "60px", "borderRadius": "50%",
-                "background": f"radial-gradient(circle, {color}25 0%, transparent 70%)",
-                "pointerEvents": "none",
-            }),
-            # 图标
-            html.Div([
+            html.Div(
+                style={
+                    "position": "absolute",
+                    "right": "-8px",
+                    "top": "-8px",
+                    "width": "60px",
+                    "height": "60px",
+                    "borderRadius": "50%",
+                    "background": f"radial-gradient(circle, rgba({_hex_to_rgba(color)}, 0.12) 0%, transparent 70%)",
+                    "pointerEvents": "none",
+                }
+            ),
+            html.Div(
                 html.I(className=f"bi {icon}", style={"fontSize": "1.1rem", "color": color}),
-            ], style={
-                "width": "34px", "height": "34px", "borderRadius": "8px",
-                "background": f"rgba({_hex_to_rgba(color)}, 0.12)",
-                "display": "flex", "alignItems": "center", "justifyContent": "center",
-                "marginBottom": "8px",
-            }),
+                style={
+                    "width": "34px",
+                    "height": "34px",
+                    "borderRadius": "8px",
+                    "background": f"rgba({_hex_to_rgba(color)}, 0.12)",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "marginBottom": "8px",
+                },
+            ),
             html.Span(label, className="dvs-stat-card__label"),
             html.Span(value, className="dvs-stat-card__value", style={"color": color}),
             html.Span(sub, className="dvs-stat-card__sub"),
@@ -334,375 +349,590 @@ def _icon_stat_card(label: str, value: str, sub: str, icon: str, color: str) -> 
     )
 
 
-# ── 洞察分析区构建（原仪表盘逻辑）───────────────────────────
+def _build_sampling_modal_body(rows: int, memory_mb: float, sample_size: int) -> html.Div:
+    return html.Div(
+        className="eda-sampling-copy",
+        children=[
+            html.P(
+                f"当前数据集约 {rows:,} 行，内存占用 {memory_mb:.1f} MB。为了保证响应速度，EDA 默认建议使用采样。",
+                className="mb-2",
+            ),
+            html.P(
+                f"推荐样本量为 {sample_size:,} 行。你也可以选择全量分析，但大数据集下图表和统计计算会更慢。",
+                className="mb-0 text-muted",
+            ),
+        ],
+    )
 
-def _build_insight_section(df: pd.DataFrame) -> list:
-    """构建仪表盘样式的数据洞察分析区块，嵌入数据画布底部。"""
-    try:
-        from services.data_workshop.quality_analyzer import QualityAnalyzer
-        from services.data_workshop.type_detector import TypeDetector
 
-        qa = QualityAnalyzer()
-        analysis = qa.analyze_dataframe(df)
-        ov = analysis['overview']
+def _empty_state(title: str, subtitle: str) -> html.Div:
+    return html.Div(
+        className="dvs-empty",
+        children=[
+            html.Div("📭", className="dvs-empty__icon"),
+            html.Div(title, className="dvs-empty__text"),
+            html.Div(subtitle, style={"color": "var(--text-muted)", "fontSize": "var(--text-sm)"}),
+        ],
+    )
 
-        td = TypeDetector()
-        mismatches = td.get_mismatched_columns(df)
-    except Exception:
-        ov = {}
-        analysis = {"issues": [], "recommendations": []}
-        mismatches = []
 
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-
+def _sampling_pending_section(rows: int, memory_mb: float, sample_size: int) -> List[html.Div]:
     return [
-        # 分隔线 + 区块标题
-        html.Hr(style={"borderColor": "var(--border)", "margin": "24px 0 20px 0"}),
+        _section_header("自动洞察", "请先确认分析模式，再执行 EDA 计算。", icon="bi-stars"),
         html.Div(
-            style={"display": "flex", "alignItems": "center", "marginBottom": "16px", "gap": "10px"},
+            className="eda-empty-card",
             children=[
+                html.Div("建议先选择采样或全量分析", className="eda-empty-card__title"),
                 html.Div(
-                    html.I(className="bi bi-bar-chart-line-fill",
-                           style={"color": "#3B82F6", "fontSize": "1rem"}),
-                    style={
-                        "width": "32px", "height": "32px", "borderRadius": "8px",
-                        "background": "rgba(59,130,246,0.12)",
-                        "display": "flex", "alignItems": "center", "justifyContent": "center",
-                    }
+                    f"当前数据集 {rows:,} 行，{memory_mb:.1f} MB。推荐样本量 {sample_size:,} 行。",
+                    className="eda-empty-card__text",
                 ),
-                html.H5("数据洞察分析", style={
-                    "margin": 0, "fontWeight": "700", "fontSize": "1rem",
-                    "color": "var(--text-primary)",
-                }),
-                html.Span("· 基于当前数据集自动生成",
-                          style={"fontSize": "0.78rem", "color": "var(--text-secondary)"}),
-            ]
+            ],
         ),
+    ]
 
-        # ══ 分区一：缺失值 + 字段类型占比 ══
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(
-                        html.Div([
-                            html.I(className="bi bi-bar-chart-steps me-2",
-                                   style={"color": "#F59E0B"}),
-                            html.Span("列缺失概貌", style={"fontWeight": "600", "fontSize": "0.9rem"}),
-                        ])
-                    ),
-                    dbc.CardBody([
-                        dcc.Graph(figure=_missing_bar(df), config={"displayModeBar": False},
-                                  style={"height": "240px"})
-                    ], style={"padding": "8px"})
-                ], className="card-hover h-100",
-                   style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)",
-                          "borderRadius": "10px"})
-            ], width=7, className="stagger-item"),
 
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(
-                        html.Div([
-                            html.I(className="bi bi-pie-chart-fill me-2",
-                                   style={"color": "#8B5CF6"}),
-                            html.Span("字段类型占比", style={"fontWeight": "600", "fontSize": "0.9rem"}),
-                        ])
-                    ),
-                    dbc.CardBody([
-                        dcc.Graph(figure=_dtype_pie(df), config={"displayModeBar": False},
-                                  style={"height": "240px"})
-                    ], style={"padding": "8px"})
-                ], className="card-hover h-100",
-                   style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)",
-                          "borderRadius": "10px"})
-            ], width=5, className="stagger-item"),
-        ], className="g-3 mb-3 stagger-container"),
+def _sampling_cancelled_section() -> List[html.Div]:
+    return [
+        _section_header("自动洞察", "本次已取消分析。", icon="bi-stars"),
+        html.Div(
+            className="eda-empty-card",
+            children=[
+                html.Div("EDA 尚未执行", className="eda-empty-card__title"),
+                html.Div("你可以重新选择采样或全量分析后继续。", className="eda-empty-card__text"),
+            ],
+        ),
+    ]
 
-        # ══ 分区二：质量问题 + 类型推断 ══
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="bi bi-bug me-2", style={"color": "#EF4444"}),
-                        html.Span("已发现的质量问题", style={"fontWeight": "600", "fontSize": "0.9rem"}),
-                        dbc.Badge(str(len(analysis.get('issues', []))), color="danger", className="ms-2"),
-                    ]),
-                    dbc.CardBody([
-                        _issues_list(analysis.get('issues', []), analysis.get('recommendations', []))
-                    ], style={"maxHeight": "260px", "overflowY": "auto", "padding": "12px"})
-                ], className="card-hover h-100",
-                   style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)",
-                          "borderRadius": "10px"})
-            ], width=6, className="stagger-item"),
 
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="bi bi-arrow-left-right me-2", style={"color": "#06B6D4"}),
-                        html.Span("潜在类型推断", style={"fontWeight": "600", "fontSize": "0.9rem"}),
-                        dbc.Badge(str(len(mismatches)), color="info", className="ms-2"),
-                    ]),
-                    dbc.CardBody([
-                        _type_suggestions(mismatches) if mismatches else
-                        html.Div([
-                            html.I(className="bi bi-check-circle-fill text-success",
-                                   style={"fontSize": "2rem", "marginBottom": "8px"}),
-                            html.P("所有列类型匹配完美", className="text-muted mb-0",
-                                   style={"fontSize": "0.85rem"}),
-                        ], className="d-flex flex-column align-items-center justify-content-center h-100 py-4")
-                    ], style={"maxHeight": "260px", "overflowY": "auto", "padding": "12px"})
-                ], className="card-hover h-100",
-                   style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)",
-                          "borderRadius": "10px"})
-            ], width=6, className="stagger-item"),
-        ], className="g-3 mb-3 stagger-container"),
-
-        # ══ 分区三：数值特征分布摘要 ══
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="bi bi-table me-2", style={"color": "#3B82F6"}),
-                        html.Span("数值特征分布摘要", style={"fontWeight": "600", "fontSize": "0.9rem"}),
-                    ]),
-                    dbc.CardBody([
-                        _numeric_summary_table(df) if numeric_cols else
-                        html.P("无有效数值列可供统计", className="text-muted text-center py-3",
-                               style={"fontSize": "0.85rem"})
-                    ], style={"maxHeight": "220px", "overflowY": "auto", "padding": "8px"})
-                ], className="card-hover",
-                   style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)",
-                          "borderRadius": "10px"})
-            ], width=12, className="stagger-item"),
-        ], className="g-3 mb-3 stagger-container"),
-
-        # ══ 分区四：自动分布速览图 ══
-        _auto_distribution_charts(df, numeric_cols, cat_cols),
-
-        # ══ 分区五：相关性热力图 ══
-        *(_correlation_heatmap_section(df, numeric_cols)),
-
-        # 底部留白
+def _build_insight_section(df: pd.DataFrame, report: Dict[str, Any]) -> List[html.Div]:
+    return [
+        html.Hr(style={"borderColor": "var(--border)", "margin": "24px 0 20px 0"}),
+        _build_business_intro_section(report),
+        _build_readiness_section(report),
+        _build_comparison_section(report),
+        _build_relationship_section(report),
+        _build_distribution_story_section(df, report),
+        _build_field_guide_section(report),
+        _build_next_steps_section(report),
         html.Div(style={"height": "32px"}),
     ]
 
 
-# ──────────────────────────────────────────────────────────
-# ── 图表和辅助函数（原仪表盘 helpers）──────────────────────
-# ──────────────────────────────────────────────────────────
-
-def _dtype_pie(df: pd.DataFrame):
-    type_counts = df.dtypes.astype(str).value_counts()
-    colors = ["#3B82F6", "#8B5CF6", "#10B981", "#F59E0B", "#EF4444", "#06B6D4"]
-    fig = px.pie(
-        names=type_counts.index, values=type_counts.values,
-        hole=0.45, color_discrete_sequence=colors,
-    )
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=10, r=10, t=10, b=10), font=dict(size=11),
-        showlegend=True, legend=dict(font=dict(size=10)),
-    )
-    return fig
-
-
-def _missing_bar(df: pd.DataFrame):
-    missing = df.isnull().sum()
-    missing = missing[missing > 0].sort_values(ascending=True)
-
-    if missing.empty:
-        fig = go.Figure()
-        fig.add_annotation(text="✅ 无缺失值", xref="paper", yref="paper",
-                           x=0.5, y=0.5, showarrow=False,
-                           font=dict(size=16, color="#10B981"))
-    else:
-        fig = px.bar(
-            x=missing.values, y=missing.index, orientation='h',
-            labels={'x': '缺失数', 'y': '列名'},
-            color=missing.values,
-            color_continuous_scale=["#10B981", "#F59E0B", "#EF4444"],
-        )
-        fig.update_coloraxes(showscale=False)
-
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=10, r=20, t=10, b=20), font=dict(size=11),
-        xaxis=dict(gridcolor="var(--border)"),
-        yaxis=dict(gridcolor="var(--border)"),
-    )
-    return fig
-
-
-def _numeric_summary_table(df: pd.DataFrame):
-    numeric_df = df.select_dtypes(include=[np.number])
-    if numeric_df.empty:
-        return html.P("无数值列", className="text-muted")
-
-    desc = numeric_df.describe().T
-    desc = desc[['count', 'mean', 'std', 'min', '50%', 'max']].round(2)
-    desc.columns = ['有效值', '均值', '标准差', '最小', '中位数', '最大']
-
-    return dbc.Table.from_dataframe(
-        desc.reset_index().rename(columns={'index': '列名'}),
-        striped=True, bordered=True, hover=True, size='sm',
-        style={"fontSize": "0.8rem"}
-    )
-
-
-def _issues_list(issues, recommendations):
-    items = []
-    severity_icons = {'high': '🔴', 'medium': '🟡', 'low': '🔵', 'info': 'ℹ️'}
-
-    for issue in issues[:10]:
-        sev = issue.get('severity', 'info')
-        items.append(
-            html.Li([
-                html.Span(severity_icons.get(sev, 'ℹ️'), className="me-2"),
-                issue['message']
-            ], className="mb-1", style={"fontSize": "0.83rem"})
-        )
-
-    if recommendations:
-        items.append(html.Hr(className="my-2"))
-        items.append(html.Strong("建议:", style={"fontSize": "0.83rem"}))
-        for rec in recommendations[:5]:
-            items.append(
-                html.Li([html.Span("💡", className="me-2"), rec],
-                        className="mb-1", style={"fontSize": "0.83rem"})
-            )
-
-    if not items:
-        return html.P("✅ 数据质量良好", className="text-muted text-center",
-                      style={"fontSize": "0.85rem"})
-
-    return html.Ul(items, style={"listStyle": "none", "paddingLeft": "0", "margin": 0})
-
-
-def _type_suggestions(mismatches):
-    items = []
-    for m in mismatches[:8]:
-        sugg = m.get('suggestion', {}) or {}
-        items.append(
-            dbc.ListGroupItem([
-                html.Div([
-                    html.Strong(m['column'], className="me-2"),
-                    dbc.Badge(m['current_type'], color="secondary", className="me-1"),
-                    html.Span("→", className="mx-1"),
-                    dbc.Badge(sugg.get('target_type', '?'), color="info"),
-                    html.Span(
-                        f" (置信度: {m['confidence']:.0%}, 预计失败: {sugg.get('expected_failures', 0)})",
-                        style={"fontSize": "0.73rem", "color": "var(--text-muted)"}
+def _build_business_intro_section(report: Dict[str, Any]) -> html.Div:
+    overview = report["overview"]
+    sample_meta = report["sample_meta"]
+    use_cases = _derive_business_use_cases(report)
+    return html.Div(
+        className="eda-section-card",
+        children=[
+            _section_header(
+                "这份数据可以帮你做什么",
+                "直接告诉你可以做哪些业务分析，不需要先理解统计术语。",
+                icon="bi-stars",
+            ),
+            html.Div(
+                className="eda-summary-banner",
+                children=[
+                    html.Div(
+                        className="eda-summary-banner__main",
+                        children=[
+                            html.Div(
+                                "可直接开始分析" if overview["quality_score"] >= 80 else "建议先清理后再分析",
+                                className="eda-summary-banner__title",
+                            ),
+                            html.Div(
+                                f"当前共有 {overview['rows']:,} 行、{overview['cols']} 个字段。"
+                                f"{' 使用了样本预览，适合先看方向。' if sample_meta['used_sampling'] else ' 当前是全量分析，更适合直接下判断。'}",
+                                className="eda-summary-banner__text",
+                            ),
+                        ],
                     ),
-                ]),
-            ], style={"fontSize": "0.83rem"})
-        )
-    return dbc.ListGroup(items, flush=True)
-
-
-def _auto_distribution_charts(df, numeric_cols, cat_cols):
-    """自动生成数值+分类特征分布速览图"""
-    charts = []
-
-    for col in numeric_cols[:3]:
-        clean = df[col].dropna()
-        if len(clean) == 0:
-            continue
-        fig = px.histogram(x=clean, nbins=min(30, max(10, int(len(clean) ** 0.5))),
-                           color_discrete_sequence=["#6366F1"])
-        fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=10, r=10, t=5, b=25), height=175,
-            font=dict(size=9), showlegend=False,
-            xaxis=dict(title=None, gridcolor="var(--border)"),
-            yaxis=dict(title=None),
-        )
-        charts.append(dbc.Col([
-            dbc.Card([
-                dbc.CardHeader([html.I(className="bi bi-hash me-1", style={"color": "#6366F1"}),
-                                f" {col}"],
-                               style={"fontWeight": "600", "fontSize": "0.78rem", "padding": "6px 10px"}),
-                dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})],
-                             style={"padding": "4px"})
-            ], className="card-hover",
-               style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)",
-                      "borderRadius": "10px"})
-        ], width=4, className="stagger-item"))
-
-    for col in cat_cols[:3]:
-        freq = df[col].value_counts().head(6)
-        if len(freq) == 0:
-            continue
-        fig = px.bar(x=freq.values, y=freq.index, orientation="h",
-                     color_discrete_sequence=["#8B5CF6"])
-        fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=10, r=10, t=5, b=25), height=175,
-            font=dict(size=9), showlegend=False,
-            xaxis=dict(title=None, gridcolor="var(--border)"),
-            yaxis=dict(title=None, autorange="reversed"),
-        )
-        charts.append(dbc.Col([
-            dbc.Card([
-                dbc.CardHeader([html.I(className="bi bi-tag me-1", style={"color": "#8B5CF6"}),
-                                f" {col}"],
-                               style={"fontWeight": "600", "fontSize": "0.78rem", "padding": "6px 10px"}),
-                dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})],
-                             style={"padding": "4px"})
-            ], className="card-hover",
-               style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)",
-                      "borderRadius": "10px"})
-        ], width=4, className="stagger-item"))
-
-    if not charts:
-        return html.Div()
-
-    return dbc.Row([
-        dbc.Col(html.Div([
-            html.I(className="bi bi-grid-3x3 me-2", style={"color": "#6366F1"}),
-            html.Span("特征分布速览", style={"fontWeight": "600", "fontSize": "0.9rem"}),
-        ], style={"display": "flex", "alignItems": "center", "marginBottom": "12px"}), width=12),
-        *charts,
-    ], className="mb-3 stagger-container")
-
-
-def _correlation_heatmap_section(df, numeric_cols):
-    """相关性热力图区域"""
-    if len(numeric_cols) < 2:
-        return []
-
-    corr = df[numeric_cols].corr().round(2)
-    fig = px.imshow(
-        corr, text_auto=True, color_continuous_scale="RdBu_r",
-        zmin=-1, zmax=1, aspect="auto",
-    )
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=20, r=20, t=20, b=20),
-        height=max(280, len(numeric_cols) * 35),
-        font=dict(size=10),
+                    html.Div(
+                        className="eda-summary-banner__meta",
+                        children=[
+                            _summary_kv("当前模式", "推荐采样" if sample_meta["used_sampling"] else "全量分析"),
+                            _summary_kv("样本量", f"{sample_meta['sample_rows']:,} 行"),
+                            _summary_kv("数据健康度", f"{overview['quality_score']:.1f}/100"),
+                        ],
+                    ),
+                ],
+            ),
+            html.Div(
+                className="eda-usecase-grid",
+                children=[_use_case_card(item) for item in use_cases],
+            ),
+        ],
     )
 
-    return [
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="bi bi-grid-3x3-gap me-2", style={"color": "#F59E0B"}),
-                        html.Span("相关性热力图", style={"fontWeight": "600", "fontSize": "0.9rem"}),
-                    ]),
-                    dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])
-                ], className="card-hover",
-                   style={"backgroundColor": "var(--bg-secondary)", "border": "1px solid var(--border)",
-                          "borderRadius": "10px"})
-            ], width=12, className="stagger-item"),
-        ], className="mb-4 stagger-container"),
+
+def _build_readiness_section(report: Dict[str, Any]) -> html.Div:
+    overview = report["overview"]
+    alerts = report["quality_alerts"]
+    readiness_cards = [
+        ("缺失值", f"{overview['missing_pct']:.2f}%", "看看是否有空白数据会影响统计口径。"),
+        ("重复记录", f"{overview['duplicate_pct']:.2f}%", "避免同一单据、同一用户被重复计算。"),
+        ("当前可用程度", "较高" if overview["quality_score"] >= 80 else "一般", "先判断能否直接给业务结论。"),
     ]
+    return html.Div(
+        className="eda-section-card",
+        children=[
+            _section_header("现在能不能直接拿来分析", "先看数据是否干净、是否容易误判。", icon="bi-shield-check"),
+            html.Div(
+                className="eda-readiness-grid",
+                children=[
+                    html.Div(
+                        className="eda-subsection-card",
+                        children=[
+                            html.Div("先看这 3 件事", className="eda-subsection-title"),
+                            html.Div(
+                                className="eda-readiness-cards",
+                                children=[
+                                    html.Div(
+                                        className="eda-readiness-card",
+                                        children=[
+                                            html.Div(label, className="eda-readiness-card__label"),
+                                            html.Div(value, className="eda-readiness-card__value"),
+                                            html.Div(desc, className="eda-readiness-card__text"),
+                                        ],
+                                    )
+                                    for label, value, desc in readiness_cards
+                                ],
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="eda-subsection-card",
+                        children=[
+                            html.Div("建议先处理的问题", className="eda-subsection-title"),
+                            html.Div(
+                                className="eda-alert-grid",
+                                children=[_alert_card(item) for item in alerts[:6]]
+                                or [html.Div("目前没有明显问题，可以直接开始分析。", className="eda-empty-card__text")],
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
 
 
-# ═══════════════════════════════════════════════════════════
-# ── 导出回调 ─────────────────────────────────────────────
-# ═══════════════════════════════════════════════════════════
+def _build_comparison_section(report: Dict[str, Any]) -> html.Div:
+    relationships = report["relationship_findings"]
+    comparison_items = [
+        f"{item['category']} 可以拿来比较 {item['numeric']}，当前差距最明显。"
+        for item in relationships["categorical_numeric_pairs"][:5]
+    ]
+    if not comparison_items:
+        comparison_items = ["当前数据里还没有明显的分组差异，可优先查看分类字段是否足够。"]
+    return html.Div(
+        className="eda-section-card",
+        children=[
+            _section_header("适合做什么业务比较", "比如比较不同客户、门店、产品、区域谁表现更好。", icon="bi-people"),
+            html.Div(
+                className="eda-story-grid",
+                children=[
+                    html.Div(
+                        className="eda-subsection-card",
+                        children=[
+                            html.Div("你现在可以直接做这些比较", className="eda-subsection-title"),
+                            _relationship_list("优先推荐的比较方向", comparison_items),
+                        ],
+                    ),
+                    html.Div(
+                        className="eda-subsection-card",
+                        children=[
+                            html.Div("这类分析常见在这些场景", className="eda-subsection-title"),
+                            html.Ul(
+                                [
+                                    html.Li("比较不同产品线、品牌、门店或区域的销售表现。"),
+                                    html.Li("比较不同客户类型、渠道或活动带来的结果差异。"),
+                                    html.Li("找出哪一类人群、商品或服务表现最好或最差。"),
+                                ],
+                                className="eda-relationship-list",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def _build_relationship_section(report: Dict[str, Any]) -> html.Div:
+    relationships = report["relationship_findings"]
+    relationship_items = [
+        f"{item['var1']} 和 {item['var2']} 经常一起变化，可联动看。"
+        for item in relationships["numeric_pairs"][:6]
+    ]
+    if not relationship_items:
+        relationship_items = ["当前数值指标较少，暂时无法判断哪些指标会一起变化。"]
+    return html.Div(
+        className="eda-section-card",
+        children=[
+            _section_header("哪些指标通常会一起变化", "适合用来找联动关系、主次指标和关键驱动因素。", icon="bi-diagram-3"),
+            html.Div(
+                className="eda-story-grid",
+                children=[
+                    html.Div(
+                        className="eda-chart-card",
+                        children=[
+                            html.Div("可联动查看的指标", className="eda-subsection-title"),
+                            _relationship_list("优先关注", relationship_items),
+                            html.Div(
+                                "可用于看成交额和利润是否同步、曝光和转化是否同步、客单价和复购是否同步。",
+                                className="eda-empty-card__text",
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="eda-chart-card",
+                        children=[dcc.Graph(figure=EDAService.create_correlation_heatmap(report), config={"displayModeBar": False})],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def _build_distribution_story_section(df: pd.DataFrame, report: Dict[str, Any]) -> html.Div:
+    category_cards: List[html.Div] = []
+    numeric_cards: List[html.Div] = []
+    for item in report["quick_distributions"]["categorical"]:
+        category_cards.append(
+            html.Div(
+                className="eda-chart-card",
+                children=[
+                    html.Div(f"{item['name']} 的构成", className="eda-subsection-title"),
+                    dcc.Graph(figure=EDAService.create_categorical_distribution(df[item["name"]]), config={"displayModeBar": False}),
+                ],
+            )
+        )
+    for item in report["quick_distributions"]["numeric"]:
+        numeric_cards.append(
+            html.Div(
+                className="eda-chart-card",
+                children=[
+                    html.Div(f"{item['name']} 的范围", className="eda-subsection-title"),
+                    dcc.Graph(figure=EDAService.create_numeric_distribution(df[item["name"]]), config={"displayModeBar": False}),
+                ],
+            )
+        )
+
+    return html.Div(
+        className="eda-section-card",
+        children=[
+            _section_header("可以看结构，也可以看波动", "一边看分类占比，一边看关键指标分布。", icon="bi-bar-chart-line"),
+            html.Div(
+                className="eda-story-grid",
+                children=[
+                    html.Div(
+                        className="eda-subsection-card",
+                        children=[
+                            html.Div("看看分类构成", className="eda-subsection-title"),
+                            html.Div(
+                                className="eda-chart-grid",
+                                children=category_cards or [html.Div("当前没有适合直接看构成的分类字段。", className="eda-empty-card__text")],
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="eda-subsection-card",
+                        children=[
+                            html.Div("看看数值波动", className="eda-subsection-title"),
+                            html.Div(
+                                className="eda-chart-grid",
+                                children=numeric_cards or [html.Div("当前没有适合直接看波动的数值字段。", className="eda-empty-card__text")],
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def _build_field_guide_section(report: Dict[str, Any]) -> html.Div:
+    return html.Div(
+        className="eda-section-card",
+        children=[
+            _section_header("字段怎么用最合适", "不用懂字段类型，直接看它更适合做比较、做汇总还是做时间分析。", icon="bi-table"),
+            html.Div(
+                className="eda-profile-stack",
+                children=[
+                    _profile_table(
+                        "适合做数值分析的字段",
+                        [_profile_to_usage_row(item, "numeric") for item in report["numeric_profiles"]],
+                        [("字段", "name"), ("更适合拿来做", "usage"), ("当前提醒", "note")],
+                        "当前数据集没有可直接做数值分析的字段。",
+                    ),
+                    _profile_table(
+                        "适合做人群/分类比较的字段",
+                        [_profile_to_usage_row(item, "categorical") for item in report["categorical_profiles"]],
+                        [("字段", "name"), ("更适合拿来做", "usage"), ("当前提醒", "note")],
+                        "当前数据集没有可直接做分组比较的字段。",
+                    ),
+                    _profile_table(
+                        "适合看趋势和周期的字段",
+                        [_profile_to_usage_row(item, "datetime") for item in report["datetime_profiles"]],
+                        [("字段", "name"), ("更适合拿来做", "usage"), ("当前提醒", "note")],
+                        "当前数据集没有时间字段，暂时不适合做趋势分析。",
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def _build_next_steps_section(report: Dict[str, Any]) -> html.Div:
+    suggestions = _derive_next_steps(report)
+    return html.Div(
+        className="eda-section-card",
+        children=[
+            _section_header("下一步最值得做什么", "先给业务分析师一个清晰的动作建议。", icon="bi-lightbulb"),
+            html.Div(
+                className="eda-usecase-grid",
+                children=[
+                    html.Div(
+                        className="eda-usecase-card",
+                        children=[
+                            html.Div("建议 01", className="eda-usecase-card__eyebrow"),
+                            html.Div(item["title"], className="eda-usecase-card__title"),
+                            html.Div(item["description"], className="eda-usecase-card__text"),
+                        ],
+                    )
+                    for item in suggestions
+                ],
+            ),
+        ],
+    )
+
+
+def _section_header(title: str, subtitle: str, icon: str) -> html.Div:
+    return html.Div(
+        className="eda-section-header",
+        children=[
+            html.Div(html.I(className=f"bi {icon}"), className="eda-section-header__icon"),
+            html.Div(
+                children=[
+                    html.Div(title, className="eda-section-header__title"),
+                    html.Div(subtitle, className="eda-section-header__subtitle"),
+                ]
+            ),
+        ],
+    )
+
+
+def _alert_card(item: Dict[str, Any]) -> html.Div:
+    severity_class = "eda-alert-card--warning" if item["severity"] == "warning" else "eda-alert-card--info"
+    return html.Div(
+        className=f"eda-alert-card {severity_class}",
+        children=[
+            html.Div(item["title"], className="eda-alert-card__title"),
+            html.Div(item["message"], className="eda-alert-card__message"),
+            html.Div(f"建议：{item['suggested_action']}", className="eda-alert-card__action"),
+        ],
+    )
+
+
+def _summary_kv(label: str, value: str) -> html.Div:
+    return html.Div(
+        className="eda-summary-banner__kv",
+        children=[
+            html.Div(label, className="eda-summary-banner__kv-label"),
+            html.Div(value, className="eda-summary-banner__kv-value"),
+        ],
+    )
+
+
+def _use_case_card(item: Dict[str, str]) -> html.Div:
+    return html.Div(
+        className="eda-usecase-card",
+        children=[
+            html.Div(item["eyebrow"], className="eda-usecase-card__eyebrow"),
+            html.Div(item["title"], className="eda-usecase-card__title"),
+            html.Div(item["description"], className="eda-usecase-card__text"),
+            html.Div(item["scene"], className="eda-usecase-card__scene"),
+        ],
+    )
+
+
+def _derive_business_use_cases(report: Dict[str, Any]) -> List[Dict[str, str]]:
+    use_cases: List[Dict[str, str]] = []
+    if report["relationship_findings"]["categorical_numeric_pairs"]:
+        use_cases.append(
+            {
+                "eyebrow": "分组比较",
+                "title": "比较不同客户、门店、产品或区域的表现",
+                "description": "直接找出哪一类对象更高、更低、差距最大。",
+                "scene": "适合销售、运营、投放、门店经营分析。",
+            }
+        )
+    if report["relationship_findings"]["numeric_pairs"]:
+        use_cases.append(
+            {
+                "eyebrow": "指标联动",
+                "title": "找到会一起变化的关键指标",
+                "description": "判断一个指标变化时，哪些结果会一起跟着变。",
+                "scene": "适合增长、转化、利润、成本联动分析。",
+            }
+        )
+    if report["categorical_profiles"]:
+        use_cases.append(
+            {
+                "eyebrow": "结构分析",
+                "title": "看不同分类的构成和占比",
+                "description": "快速判断主力分类、长尾分类和结构是否失衡。",
+                "scene": "适合人群、品类、渠道、地区结构分析。",
+            }
+        )
+    if report["numeric_profiles"]:
+        use_cases.append(
+            {
+                "eyebrow": "波动查看",
+                "title": "看关键指标大概落在哪些区间",
+                "description": "可以快速发现值集中在哪、是否有明显异常波动。",
+                "scene": "适合客单价、销量、利润、时长等指标。",
+            }
+        )
+    if report["datetime_profiles"]:
+        use_cases.append(
+            {
+                "eyebrow": "趋势分析",
+                "title": "看时间趋势、节奏和周期",
+                "description": "适合分析每天、每周、每月的变化方向。",
+                "scene": "适合订单、流量、活跃、库存趋势分析。",
+            }
+        )
+    use_cases.append(
+        {
+            "eyebrow": "分析前检查",
+            "title": "先判断数据能不能直接拿来汇报",
+            "description": "提前发现重复、空值、可疑字段，减少误判。",
+            "scene": "适合所有业务分析场景。",
+        }
+    )
+    return use_cases[:6]
+
+
+def _derive_next_steps(report: Dict[str, Any]) -> List[Dict[str, str]]:
+    steps: List[Dict[str, str]] = []
+    if report["overview"]["missing_pct"] > 0 or report["overview"]["duplicate_pct"] > 0:
+        steps.append(
+            {
+                "title": "先清理会影响结果的问题",
+                "description": "优先处理空值、重复记录和不适合直接分析的字段，再做正式汇报。",
+            }
+        )
+    if report["relationship_findings"]["categorical_numeric_pairs"]:
+        pair = report["relationship_findings"]["categorical_numeric_pairs"][0]
+        steps.append(
+            {
+                "title": f"先比较 {pair['category']} 对 {pair['numeric']} 的差异",
+                "description": "这是当前最容易直接转成业务结论的一组比较。",
+            }
+        )
+    if report["relationship_findings"]["numeric_pairs"]:
+        pair = report["relationship_findings"]["numeric_pairs"][0]
+        steps.append(
+            {
+                "title": f"联动查看 {pair['var1']} 和 {pair['var2']}",
+                "description": "如果这两个指标同步变化，通常值得继续追溯原因。",
+            }
+        )
+    if report["categorical_profiles"]:
+        item = report["categorical_profiles"][0]
+        steps.append(
+            {
+                "title": f"先看 {item['name']} 的分类构成",
+                "description": "这能帮助你快速判断分析维度是否值得继续展开。",
+            }
+        )
+    while len(steps) < 3:
+        steps.append(
+            {
+                "title": "从一个业务问题开始切入",
+                "description": "先选一个想回答的问题，再沿着这个页面给出的比较方向继续往下钻。",
+            }
+        )
+    return steps[:3]
+
+
+def _profile_to_usage_row(profile: Dict[str, Any], profile_type: str) -> Dict[str, str]:
+    if profile_type == "numeric":
+        note = "分布正常"
+        if profile.get("outlier_pct", 0) > 5:
+            note = "波动较大，建议留意异常值"
+        elif profile.get("missing_pct", 0) > 0:
+            note = "有空值，汇总前建议先处理"
+        return {
+            "name": profile["name"],
+            "usage": "做汇总、做趋势、做高低比较",
+            "note": note,
+        }
+    if profile_type == "categorical":
+        note = "可直接用于分组比较"
+        if profile.get("is_id_like"):
+            note = "更像编号，不适合直接做分类比较"
+        elif profile.get("is_high_cardinality"):
+            note = "分类太多，建议先合并后分析"
+        return {
+            "name": profile["name"],
+            "usage": "做人群、门店、区域、品类等分组比较",
+            "note": note,
+        }
+    return {
+        "name": profile["name"],
+        "usage": "做趋势、周期、时间对比分析",
+        "note": "可按日、周、月继续展开" if profile.get("range_days", 0) > 1 else "时间跨度较短，先确认是否适合做趋势",
+    }
+
+
+def _profile_table(title: str, rows: List[Dict[str, Any]], columns: List[tuple], empty_text: str) -> html.Div:
+    if not rows:
+        body = html.Div(empty_text, className="eda-empty-card__text")
+    else:
+        header = html.Tr([html.Th(col[0]) for col in columns])
+        body_rows = []
+        for row in rows[:10]:
+            cells = []
+            for column in columns:
+                label, key = column[0], column[1]
+                formatter = column[2] if len(column) > 2 else None
+                cells.append(html.Td(_format_cell(row.get(key), formatter), className="eda-table__cell"))
+            body_rows.append(html.Tr(cells))
+        body = html.Div(
+            className="eda-table-wrap",
+            children=[html.Table([html.Thead(header), html.Tbody(body_rows)], className="eda-table")],
+        )
+    return html.Div(className="eda-subsection-card", children=[html.Div(title, className="eda-subsection-title"), body])
+
+
+def _format_cell(value: Any, formatter: Optional[str]) -> str:
+    if value is None:
+        return "-"
+    if formatter == "pct":
+        return f"{float(value):.2f}%"
+    if formatter == "float":
+        return f"{float(value):.2f}"
+    if formatter == "bool":
+        return "是" if bool(value) else "否"
+    return str(value)
+
+
+def _relationship_list(title: str, items: Iterable[str]) -> html.Div:
+    items = list(items)
+    if not items:
+        return html.Div([html.Div(title, className="eda-subsection-title"), html.Div("暂无可展示结果。", className="eda-empty-card__text")])
+    return html.Div(
+        className="eda-relationship-block",
+        children=[
+            html.Div(title, className="eda-subsection-title"),
+            html.Ul([html.Li(item) for item in items], className="eda-relationship-list"),
+        ],
+    )
+
 
 @callback(
     Output("download-data-file", "data"),
@@ -711,21 +941,18 @@ def _correlation_heatmap_section(df, numeric_cols):
     Input("btn-export-json", "n_clicks"),
     prevent_initial_call=True,
 )
-def export_data(csv_clicks, excel_clicks, json_clicks):
-    """将当前活跃数据集导出为 CSV / Excel / JSON。"""
+def export_data(csv_clicks: Optional[int], excel_clicks: Optional[int], json_clicks: Optional[int]):
     dm = DataManager()
     df = dm.active_df
     if df is None:
         return no_update
 
     name = dm.active_name or "data"
-    triggered = ctx.triggered_id
-
-    if triggered == "btn-export-csv":
+    if ctx.triggered_id == "btn-export-csv":
         return dcc.send_data_frame(df.to_csv, f"{name}.csv", index=False)
-    elif triggered == "btn-export-excel":
+    if ctx.triggered_id == "btn-export-excel":
         return dcc.send_data_frame(df.to_excel, f"{name}.xlsx", index=False)
-    elif triggered == "btn-export-json":
+    if ctx.triggered_id == "btn-export-json":
         return dcc.send_data_frame(df.to_json, f"{name}.json", orient="records", force_ascii=False)
     return no_update
 
@@ -733,16 +960,18 @@ def export_data(csv_clicks, excel_clicks, json_clicks):
 @callback(
     Output("download-report-file", "data"),
     Input("btn-export-report", "n_clicks"),
+    State("eda-analysis-mode", "data"),
+    State("eda-sample-size", "data"),
     prevent_initial_call=True,
 )
-def export_report(n_clicks):
-    """导出 HTML 分析报告。"""
+def export_report(n_clicks: Optional[int], analysis_mode: Optional[str], sample_size: Optional[int]):
     dm = DataManager()
     df = dm.active_df
     if df is None:
         return no_update
 
-    from services.report_generator import ReportGenerator
     name = dm.active_name or "data"
-    html_content = ReportGenerator.generate_html_report(df, name)
-    return dict(content=html_content, filename=f"{name}_分析报告.html")
+    mode = analysis_mode or "full"
+    effective_sample_size = sample_size if mode == "sample" else None
+    html_content = ReportGenerator.generate_html_report(df, name, mode=mode, sample_size=effective_sample_size)
+    return {"content": html_content, "filename": f"{name}_分析报告.html"}

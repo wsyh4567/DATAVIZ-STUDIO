@@ -55,7 +55,7 @@ server = app.server
 app.layout = html.Div(
     id="app-root",
     className="dvs-app",
-    **{"data-theme": "dark"},
+    **{"data-theme": "light"},
     children=[
         # Global stores
         dcc.Store(id="app-store", data=get_initial_state(), storage_type="session"),
