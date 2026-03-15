@@ -39,3 +39,6 @@ htmlcov/
 *.tmp
 *.bak
 .codex/
+.playwright-cli/
+output/playwright/
+debug_trace.txt
