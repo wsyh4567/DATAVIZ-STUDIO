@@ -2708,3 +2708,145 @@
     color: var(--text-muted);
     cursor: pointer;
 }
+
+.dvs-db-config-modal .modal-dialog {
+    max-width: 920px;
+}
+
+.dvs-db-modal {
+    display: grid;
+    gap: var(--sp-4);
+}
+
+.dvs-db-form {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px 14px;
+    padding: 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.dvs-db-form__row {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+}
+
+.dvs-db-form__row--half {
+    grid-column: span 2;
+}
+
+.dvs-db-form__row--full {
+    grid-column: 1 / -1;
+}
+
+.dvs-db-form__label {
+    color: var(--text-primary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    line-height: 1.2;
+}
+
+.dvs-db-form__required {
+    color: #d92d20;
+    font-weight: 700;
+}
+
+.dvs-db-form__optional {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.dvs-db-form input,
+.dvs-db-form .Select-control,
+.dvs-db-form .Select__control {
+    min-height: 38px;
+    border-radius: var(--radius-md);
+}
+
+.dvs-db-form__hint {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.dvs-db-form__hint-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(255, 107, 53, 0.1);
+    border: 1px solid rgba(255, 107, 53, 0.18);
+    color: var(--accent-primary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+}
+
+.dvs-db-sql-panel {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, rgba(18, 22, 34, 0.92), rgba(12, 15, 24, 0.98));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dvs-db-sql-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.dvs-db-sql-panel__title {
+    color: #f6f8fc;
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
+}
+
+.dvs-db-sql-panel__meta {
+    color: rgba(246, 248, 252, 0.6);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.dvs-db-sql-panel__textarea {
+    min-height: 420px;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(6, 9, 16, 0.9);
+    color: #f6f8fc;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.7;
+    resize: vertical;
+}
+
+.dvs-db-sql-panel__textarea::placeholder {
+    color: rgba(246, 248, 252, 0.4);
+}
+
+@media (max-width: 1100px) {
+    .dvs-db-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .dvs-db-form {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .dvs-db-form__row--half,
+    .dvs-db-form__row--full {
+        grid-column: auto;
+    }
+}
