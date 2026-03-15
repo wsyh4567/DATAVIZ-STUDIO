@@ -8,15 +8,26 @@ Built with Dash, pandas, Plotly, and scikit-learn, it covers data import, EDA, d
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![Dash](https://img.shields.io/badge/Dash-2.14+-green.svg)](https://dash.plotly.com/)
 [![Plotly](https://img.shields.io/badge/Plotly-5.18+-orange.svg)](https://plotly.com/)
+[![Version](https://img.shields.io/badge/version-0.4.0-success.svg)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Recent Updates
+## Latest Release
 
-- Project persistence is back: the top bar now supports opening and saving `.dvs` project files.
-- State restore is available: route, datasets, page state, and part of the analysis context can be restored after reopening a project.
-- Unified export flow: Chart Studio, Data Workshop, and Advanced Tools now export both `.py` scripts and `.ipynb` notebooks through the same service layer.
-- Top bar status is richer: Python runtime/version, dataset badges, and system status are displayed in one place.
-- Recent workspace upgrades include the redesigned EDA canvas, ML Studio workflow improvements, and multiple UX fixes.
+### v0.4.0 · 2026-03-09
+
+The latest formal release entry is recorded in [CHANGELOG.md](/Users/Toxic/Desktop/python/python项目DataViz%20Studio/CHANGELOG.md).
+
+- Rebuilt Data Workshop around a more structured step-based cleaning flow.
+- Expanded ML Studio with time-series, interactive inference, and batch prediction workflows.
+- Improved Chart Studio with better parameter validation and chart interaction fixes.
+- Fixed multiple stability issues across DataTable, Seaborn rendering, and global notifications.
+
+### Additional enhancements currently on `main`
+
+- Project open/save actions are available in the top bar through `.dvs` project files.
+- Reopening a project restores route, datasets, page state, and part of the analysis context.
+- Chart Studio, Data Workshop, and Advanced Tools now share a unified `.py` and `.ipynb` export workflow.
+- The top bar now includes system status, Python version, dataset badges, and quick actions.
 - Runtime dependencies were completed, including `requests`, `scipy`, `scikit-learn`, `sqlalchemy`, and `kaleido`.
 
 ## Showcase
@@ -27,46 +38,60 @@ Built with Dash, pandas, Plotly, and scikit-learn, it covers data import, EDA, d
 | Chart Studio | ML Studio |
 | ![Charts](./assets/screenshots/showcase_charts.png) | ![ML](./assets/screenshots/showcase_ml.webp) |
 
-## What It Does
+## Features By Navigation Area
 
-### 1. Data Hub
+### Home
+
+- Acts as the workspace landing page and quick navigation surface.
+- Helps users understand the main modules at a glance.
+
+### Data Hub
 
 - Imports CSV, Excel, JSON, Parquet, Feather, and more.
 - Supports local files, sample datasets, and reference-based restores.
 - Manages multiple datasets and the active dataset.
 
-### 2. Data Canvas / EDA
+### Data Canvas
 
 - Provides dataset overview, schema inspection, exports, and report entry points.
 - Useful for quick exploratory analysis and quality checks.
 
-### 3. Data Workshop
+### Data Workshop
 
 - Builds cleaning pipelines with visual steps such as filtering, sorting, missing-value handling, deduplication, and renaming.
 - Supports preview, undo/redo, and pipeline export.
 - Exports both Python scripts and Jupyter notebooks.
 
-### 4. Chart Studio
+### Chart Studio
 
 - Supports both Plotly and Seaborn.
 - Includes chart configuration, live preview, and PNG / SVG / HTML export.
 - Generates reproducible Python code and notebook exports.
 
-### 5. Statistics Lab
+### Statistics Lab
 
 - Includes descriptive statistics, correlations, grouped summaries, and common statistical tests.
 
-### 6. ML Studio
+### ML Studio
 
 - Covers classification, regression, clustering, and time-series related workflows.
 - Saves part of page state into project files for later continuation.
 
-### 7. Advanced Tools
+### Advanced Tools
 
 - Aggregates current project context into a unified export pipeline.
 - Helps bridge interactive exploration into script-based delivery.
 
-## What Changed In These Recent Commits
+## Top Bar And Project Workflow
+
+### Top bar
+
+- Open project
+- Save project
+- System status
+- Python version display
+- Active dataset badges
+- Quick actions
 
 ### `.dvs` project files
 
@@ -74,15 +99,10 @@ Built with Dash, pandas, Plotly, and scikit-learn, it covers data import, EDA, d
 - `embedded` stores data inside the project archive and is best for portability.
 - `reference` keeps the project smaller by reloading from the original source when possible.
 
-### Top bar workflow
+### Project restore
 
-- The top bar now includes project open/save actions, system status, dataset badges, and a quick action entry point.
-- The system status section shows Python runtime state and version information.
-
-### Unified code export
-
-- `services/export_service.py` now centralizes script and notebook export bundles.
-- Data Workshop, Chart Studio, and Advanced Tools all reuse this export path.
+- Reopening a project can restore route, datasets, app state, and part of page state.
+- Chart Studio, Data Workshop, and ML Studio currently integrate with this restore flow.
 
 ## Tech Stack
 
