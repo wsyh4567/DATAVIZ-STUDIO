@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
-from io import StringIO
-from dataclasses import dataclass
+import sys
+from dataclasses import dataclass, field
 from typing import Optional
 
 import pandas as pd
@@ -47,7 +47,6 @@ class DataManager:
         if self._initialized:
             return
         self._datasets: dict[str, pd.DataFrame] = {}
-        self._sources: dict[str, str] = {}
         self._active: Optional[str] = None
         self._history: list[dict] = []       # undo stack
         self._future: list[dict] = []        # redo stack
@@ -60,7 +59,6 @@ class DataManager:
         """添加数据集，返回最终使用的名称（自动去重）。"""
         final_name = self._unique_name(name)
         self._datasets[final_name] = df
-        self._sources[final_name] = source
         if self._active is None:
             self._active = final_name
         return final_name
@@ -68,7 +66,6 @@ class DataManager:
     def remove_dataset(self, name: str) -> None:
         """删除指定数据集。"""
         self._datasets.pop(name, None)
-        self._sources.pop(name, None)
         if self._active == name:
             self._active = next(iter(self._datasets), None)
 
@@ -85,7 +82,6 @@ class DataManager:
             return old_name
         final = self._unique_name(new_name)
         self._datasets[final] = self._datasets.pop(old_name)
-        self._sources[final] = self._sources.pop(old_name, "")
         if self._active == old_name:
             self._active = final
         return final
@@ -134,7 +130,7 @@ class DataManager:
             cols=len(df.columns),
             memory_mb=round(mem, 2),
             dtypes=dtypes,
-            source=self._sources.get(key, ""),
+            source="",
         )
 
     def list_datasets(self) -> list[DatasetMeta]:
@@ -144,38 +140,6 @@ class DataManager:
     @property
     def dataset_names(self) -> list[str]:
         return list(self._datasets.keys())
-
-    def export_datasets(self, storage_mode: str = "embedded") -> list[dict]:
-        exported: list[dict] = []
-        for name, df in self._datasets.items():
-            item = {
-                "name": name,
-                "source": self._sources.get(name, ""),
-                "active": name == self._active,
-                "storage_mode": storage_mode,
-            }
-            if storage_mode == "embedded":
-                item["data_json"] = df.to_json(date_format="iso", orient="split")
-            exported.append(item)
-        return exported
-
-    def restore_datasets(self, datasets: list[dict]) -> None:
-        self.clear()
-        active_name: Optional[str] = None
-        for dataset in datasets or []:
-            data_json = dataset.get("data_json")
-            if not data_json:
-                continue
-            df = pd.read_json(StringIO(data_json), orient="split")
-            final_name = self.add_dataset(
-                dataset.get("name") or "dataset",
-                df,
-                source=dataset.get("source", ""),
-            )
-            if dataset.get("active"):
-                active_name = final_name
-        if active_name and active_name in self._datasets:
-            self._active = active_name
 
     # ── Undo / Redo ───────────────────────────────────
 
@@ -233,7 +197,6 @@ class DataManager:
     def clear(self) -> None:
         """清空所有数据集和历史。"""
         self._datasets.clear()
-        self._sources.clear()
         self._history.clear()
         self._future.clear()
         self._active = None

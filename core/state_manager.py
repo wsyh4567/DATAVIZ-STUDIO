@@ -17,9 +17,5 @@ def get_initial_state() -> dict[str, Any]:
         "active_dataset": None,
         "datasets": [],         # list of dataset names
         "last_action": None,    # description of the most recent action
-        "project_name": None,
-        "project_path": None,
-        "project_storage_mode": "embedded",
-        "project_dirty": False,
         "toast": None,          # {"message": str, "type": "success"|"error"|"warning"|"info"}
     }

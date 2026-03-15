@@ -7,19 +7,10 @@ from typing import Final
 
 
 # ── 路径 ─────────────────────────────────────────────
-def _normalize_windows_path(path: Path) -> Path:
-    normalized = str(path)
-    if normalized.startswith("\\\\?\\"):
-        normalized = normalized[4:]
-    return Path(normalized)
-
-
-PROJECT_ROOT: Final[Path] = _normalize_windows_path(Path(__file__).resolve().parent)
+PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent
 ASSETS_DIR: Final[Path] = PROJECT_ROOT / "assets"
 UPLOAD_DIR: Final[Path] = PROJECT_ROOT / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-PROJECTS_DIR: Final[Path] = PROJECT_ROOT / "projects"
-PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── 服务器 ───────────────────────────────────────────
 HOST: str = os.environ.get("DATAVIZ_HOST", "127.0.0.1")

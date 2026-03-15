@@ -82,28 +82,6 @@ def create_navbar() -> html.Div:
             html.Div(
                 className="dvs-topbar__actions",
                 children=[
-                    dcc.Upload(
-                        id="project-upload",
-                        accept=".dvsp",
-                        children=html.Button(
-                            [html.I(className="bi bi-folder2-open"), html.Span("项目", className="ms-1 d-none d-md-inline")],
-                            id="btn-open-project",
-                            className="dvs-topbar__btn btn-hover",
-                            title="打开项目",
-                        ),
-                    ),
-                    html.Button(
-                        [html.I(className="bi bi-save"), html.Span("保存", className="ms-1 d-none d-md-inline")],
-                        id="btn-save-project",
-                        className="dvs-topbar__btn btn-hover",
-                        title="保存项目",
-                    ),
-                    html.Button(
-                        html.I(className="bi bi-lightning"),
-                        id="btn-quick-action",
-                        className="dvs-topbar__btn btn-hover",
-                        title="快捷操作",
-                    ),
                     html.Button(
                         html.I(className="bi bi-moon-stars"),
                         id="btn-theme-toggle",
@@ -139,36 +117,6 @@ def create_navbar() -> html.Div:
                     html.P(config.APP_DESCRIPTION, style={"color": "var(--text-muted)"}),
                 ]),
             ], id="settings-modal", is_open=False, centered=True),
-
-            dbc.Modal(
-                [
-                    dbc.ModalHeader(dbc.ModalTitle("保存项目")),
-                    dbc.ModalBody(
-                        [
-                            dbc.Label("项目名称"),
-                            dbc.Input(id="project-name-input", value="dataviz-project", placeholder="输入项目名称"),
-                            dbc.Label("数据保存方式", className="mt-3"),
-                            dbc.RadioItems(
-                                id="project-storage-mode",
-                                options=[
-                                    {"label": "内嵌数据", "value": "embedded"},
-                                    {"label": "仅保存引用", "value": "reference"},
-                                ],
-                                value="embedded",
-                            ),
-                        ]
-                    ),
-                    dbc.ModalFooter(
-                        [
-                            dbc.Button("取消", id="btn-cancel-save-project", color="secondary", outline=True),
-                            dbc.Button("保存", id="btn-confirm-save-project", color="primary"),
-                        ]
-                    ),
-                ],
-                id="save-project-modal",
-                is_open=False,
-                centered=True,
-            ),
 
             # 快速操作 Offcanvas 右侧滑出面板
             dbc.Offcanvas(
@@ -279,6 +227,5 @@ def create_navbar() -> html.Div:
                     ),
                 ],
             ),
-            dcc.Download(id="project-download"),
         ],
     )

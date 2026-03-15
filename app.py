@@ -7,7 +7,6 @@ Dash SPA 应用：顶栏 + 侧边栏 + 路由 + 状态栏 + 全局状态。
 from __future__ import annotations
 import os
 import logging
-import base64
 
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
@@ -26,7 +25,6 @@ from core.data_manager import DataManager
 from components.navbar import create_navbar
 from components.sidebar import create_sidebar
 from components.statusbar import create_statusbar
-from services.project_persistence import build_project_archive, load_project_archive, restore_project_snapshot
 from utils.helpers import format_number
 
 # Import page modules to register their callbacks
@@ -61,8 +59,6 @@ app.layout = html.Div(
     children=[
         # Global stores
         dcc.Store(id="app-store", data=get_initial_state(), storage_type="session"),
-        dcc.Store(id="project-page-store", data={}, storage_type="session"),
-        dcc.Store(id="project-restore-store", data=None, storage_type="session"),
         dcc.Location(id="url", refresh=False),
 
         # Layout regions
@@ -476,85 +472,6 @@ def show_toast(store_data):
 
 
 # ── 启动 ──────────────────────────────────────────────
-
-@callback(
-    Output("save-project-modal", "is_open"),
-    Input("btn-save-project", "n_clicks"),
-    Input("btn-cancel-save-project", "n_clicks"),
-    Input("btn-confirm-save-project", "n_clicks"),
-    State("save-project-modal", "is_open"),
-    prevent_initial_call=True,
-)
-def toggle_save_project_modal(open_clicks, cancel_clicks, confirm_clicks, is_open):
-    triggered = dash.ctx.triggered_id
-    if triggered == "btn-save-project":
-        return not is_open
-    if triggered in {"btn-cancel-save-project", "btn-confirm-save-project"}:
-        return False
-    return is_open
-
-
-@callback(
-    Output("project-download", "data"),
-    Output("app-store", "data", allow_duplicate=True),
-    Input("btn-confirm-save-project", "n_clicks"),
-    State("project-name-input", "value"),
-    State("project-storage-mode", "value"),
-    State("app-store", "data"),
-    State("project-page-store", "data"),
-    State("url", "pathname"),
-    prevent_initial_call=True,
-)
-def save_project(n_clicks, project_name, storage_mode, store_data, page_state, pathname):
-    if not n_clicks:
-        return no_update, no_update
-
-    final_name = (project_name or "dataviz-project").strip() or "dataviz-project"
-    archive = build_project_archive(
-        project_name=final_name,
-        app_state=store_data,
-        page_state=page_state,
-        pathname=pathname,
-        storage_mode=storage_mode or "embedded",
-    )
-
-    next_state = dict(store_data or {})
-    next_state["project_name"] = final_name
-    next_state["project_path"] = f"{final_name}.dvsp"
-    next_state["project_storage_mode"] = storage_mode or "embedded"
-    next_state["project_dirty"] = False
-    next_state["toast"] = {"message": f"项目已保存为 {final_name}.dvsp", "type": "success"}
-    return dcc.send_bytes(archive, f"{final_name}.dvsp"), next_state
-
-
-@callback(
-    Output("project-restore-store", "data"),
-    Output("project-page-store", "data"),
-    Output("app-store", "data", allow_duplicate=True),
-    Output("url", "pathname", allow_duplicate=True),
-    Input("project-upload", "contents"),
-    State("project-upload", "filename"),
-    prevent_initial_call=True,
-)
-def open_project(contents, filename):
-    if not contents:
-        return no_update, no_update, no_update, no_update
-
-    try:
-        _, encoded = contents.split(",", 1)
-        archive_bytes = base64.b64decode(encoded)
-        snapshot = load_project_archive(archive_bytes)
-        restored = restore_project_snapshot(snapshot)
-        app_state = dict(restored["app_state"])
-        app_state["project_path"] = filename
-        app_state["project_dirty"] = False
-        app_state["toast"] = {"message": f"项目已打开: {filename}", "type": "success"}
-        return restored, restored["page_state"], app_state, restored["route"]
-    except Exception as exc:
-        failed_state = get_initial_state()
-        failed_state["toast"] = {"message": f"打开项目失败: {exc}", "type": "error"}
-        return no_update, no_update, failed_state, no_update
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
