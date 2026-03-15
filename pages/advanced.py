@@ -13,6 +13,7 @@ import numpy as np
 from datetime import datetime
 
 from core.data_manager import DataManager
+from services.export_service import build_advanced_export
 
 
 def create_advanced_page() -> html.Div:
@@ -649,224 +650,38 @@ def run_concat(n, dataset_names, ignore_index):
     [Output('pipeline-code-container', 'style'),
      Output('pipeline-code-display', 'value')],
     Input('btn-generate-pipeline', 'n_clicks'),
+    State('project-page-store', 'data'),
     prevent_initial_call=True
 )
-def generate_pipeline_code(n_clicks):
+def generate_pipeline_code(n_clicks, project_state):
     if not n_clicks:
         return no_update
-        
-    dm = DataManager()
-    df = dm.active_df
-    meta = dm.get_meta()
-    
-    if df is None:
-         return {'display': 'block'}, "# 错误：没有加载数据集，请先前往数据中心加载数据。"
-         
-    cols_str = ", ".join([f"'{c}'" for c in df.columns[:5]]) + ("..." if len(df.columns) > 5 else "")
-    
-    code = f"""# ============================================================================
-# DataViz Studio 自动生成 - 端到端数据处理与分析流水线
-# 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-# 数据集当前状态: {meta.name if meta else 'unknown'} ({len(df)} 行, {len(df.columns)} 列)
-# ============================================================================
 
-import pandas as pd
-import numpy as np
-import plotly.express as px
-
-def run_pipeline(file_path):
-    # -------------------------------------------------------------------------
-    # 1. 加载数据
-    # -------------------------------------------------------------------------
-    print(f"Loading data from {{file_path}}...")
-    try:
-        df = pd.read_csv(file_path)
-    except Exception as e:
-        print(f"Error loading file: {{e}}")
-        return None
-        
-    # -------------------------------------------------------------------------
-    # 2. 定制化数据清洗与形态变换
-    # -------------------------------------------------------------------------
-    # 您当前数据集记录的重点关注列包含:
-    # {cols_str}
-    
-    # [在此处补充您的自定义数据规整代码，例如缺失值填补或重命名]
-    # 例: df.dropna(inplace=True)
-    # 例: df.fillna(0, inplace=True)
-    
-    # -------------------------------------------------------------------------
-    # 3. 核心可视化出图
-    # -------------------------------------------------------------------------
-"""
-    # 增加一个通用绘图例子
-    num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if len(num_cols) >= 2:
-        code += f"""    # 生成核心分布散点图示例
-    fig = px.scatter(
-        df, 
-        x='{num_cols[0]}', 
-        y='{num_cols[1]}',
-        title='数据核心特征探索 - {meta.name if meta else ""}',
-        template='plotly_white'
-    )
-    # fig.show()
-    # fig.write_html('dataviz_output.html')
-"""
-    else:
-        code += """    # 记录的数据不具备两项以上数值列，在此仅打印数据头部
-    print(df.head())
-"""
-
-    code += """
-    return df
-
-if __name__ == "__main__":
-    # 请替换为真实的分析数据文件路径 (如 ./data.csv)
-    final_df = run_pipeline("your_dataset_path.csv")
-    if final_df is not None:
-        print("DataViz Pipeline executed successfully!")
-"""
-    return {'display': 'block'}, code
-
+    bundle = build_advanced_export(project_state or {})
+    return {'display': 'block'}, bundle.py_content
 
 @callback(
     Output('download-pipeline-py-file', 'data'),
     Input('btn-download-pipeline-py', 'n_clicks'),
-    State('pipeline-code-display', 'value'),
+    State('project-page-store', 'data'),
     prevent_initial_call=True
 )
-def download_pipeline_py(n_clicks, code):
-    if not code:
+def download_pipeline_py(n_clicks, project_state):
+    if not n_clicks:
         return no_update
-    return dcc.send_string(code, filename=f"dataviz_pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py")
 
-import json
+    bundle = build_advanced_export(project_state or {})
+    return dcc.send_string(bundle.py_content, filename=bundle.py_filename)
 
 @callback(
     Output('download-pipeline-ipynb-file', 'data'),
     Input('btn-download-pipeline-ipynb', 'n_clicks'),
+    State('project-page-store', 'data'),
     prevent_initial_call=True
 )
-def download_pipeline_ipynb(n_clicks):
-    dm = DataManager()
-    df = dm.active_df
-    meta = dm.get_meta()
-    
-    if df is None:
+def download_pipeline_ipynb(n_clicks, project_state):
+    if not n_clicks:
         return no_update
-        
-    cols_str = ", ".join([f"'{c}'" for c in df.columns[:5]]) + ("..." if len(df.columns) > 5 else "")
-    
-    cells = []
-    
-    # 1. 标题 Markdown
-    cells.append({
-        "cell_type": "markdown",
-        "metadata": {},
-        "source": [
-            f"# DataViz Studio 自动生成 - 数据分析工程\n",
-            f"**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
-            f"**数据集**: {meta.name if meta else 'unknown'} ({len(df)} 行, {len(df.columns)} 列)"
-        ]
-    })
-    
-    # 2. 引入包
-    cells.append({
-        "cell_type": "code",
-        "execution_count": None,
-        "metadata": {},
-        "outputs": [],
-        "source": [
-            "import pandas as pd\n",
-            "import numpy as np\n",
-            "import plotly.express as px\n"
-        ]
-    })
-    
-    # 3. 加载与简要探查数据
-    cells.append({
-        "cell_type": "code",
-        "execution_count": None,
-        "metadata": {},
-        "outputs": [],
-        "source": [
-            "# 1. 加载数据\n",
-            "file_path = 'your_dataset_path.csv'\n",
-            "try:\n",
-            "    df = pd.read_csv(file_path)\n",
-            "    print(f\"数据加载成功，形状: {df.shape}\")\n",
-            "    display(df.head())\n",
-            "except Exception as e:\n",
-            "    print(f\"找不到文件或加载失败请修改路径: {e}\")"
-        ]
-    })
-    
-    # 4. 数据清洗注释
-    cells.append({
-        "cell_type": "code",
-        "execution_count": None,
-        "metadata": {},
-        "outputs": [],
-        "source": [
-            "# 2. 定制化数据清洗与形态变换\n",
-            f"# 当前记录重点探索列包含: {cols_str}\n\n",
-            "# 例: df.dropna(inplace=True)\n",
-            "# 例: df.fillna(0, inplace=True)\n"
-        ]
-    })
-    
-    # 5. 可视化
-    num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if len(num_cols) >= 2:
-        viz_source = [
-            "# 3. 核心可视化出图\n",
-            "fig = px.scatter(\n",
-            "    df, \n",
-            f"    x='{num_cols[0]}', \n",
-            f"    y='{num_cols[1]}',\n",
-            f"    title='数据核心特征探索 - {meta.name if meta else 'Dataset'}',\n",
-            "    template='plotly_white'\n",
-            ")\n",
-            "fig.show()\n"
-        ]
-    else:
-        viz_source = [
-            "# 3. 核心可视化出图\n",
-            "print(\"当前数据集中数值列不足两列，无法渲染二维散点图。您可以尝试其它可视化。\")"
-        ]
-        
-    cells.append({
-        "cell_type": "code",
-        "execution_count": None,
-        "metadata": {},
-        "outputs": [],
-        "source": viz_source
-    })
-    
-    notebook = {
-        "cells": cells,
-        "metadata": {
-            "kernelspec": {
-                "display_name": "Python 3",
-                "language": "python",
-                "name": "python3"
-            },
-            "language_info": {
-                "codemirror_mode": {"name": "ipython", "version": 3},
-                "file_extension": ".py",
-                "mimetype": "text/x-python",
-                "name": "python",
-                "nbconvert_exporter": "python",
-                "pygments_lexer": "ipython3",
-                "version": "3.8.0"
-            }
-        },
-        "nbformat": 4,
-        "nbformat_minor": 4
-    }
-    
-    return dict(
-        content=json.dumps(notebook, ensure_ascii=False, indent=1),
-        filename=f"dataviz_pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ipynb"
-    )
+
+    bundle = build_advanced_export(project_state or {})
+    return dict(content=bundle.ipynb_content, filename=bundle.ipynb_filename)

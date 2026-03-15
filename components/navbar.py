@@ -1,59 +1,63 @@
 # -*- coding: utf-8 -*-
-"""DataViz Studio — 顶部导航栏组件
-
-Monarch Money 风格：左侧品牌 Logo + 页面标题，右侧操作区含快速操作按钮。
-"""
+"""Top navigation bar."""
 
 from __future__ import annotations
 
-from dash import html, dcc
+from dash import dcc, html
 import dash_bootstrap_components as dbc
 
 import config
+from services.project_persistence import PROJECT_EXTENSION
 
-# 路由路径 → 页面标题映射
-_PAGE_LABELS = {
-    "/":           "欢迎",
-    "/canvas":     "数据画布",
-    "/data":       "数据中心",
-    "/workshop":   "数据工坊",
-    "/charts":     "图表工作室",
-    "/stats":      "统计实验室",
-    "/profiling":  "数据概况",
-    "/dashboard":  "仪表盘",
-    "/advanced":   "高级工具",
-}
+
+def _project_button(label: str, icon: str, button_id: str) -> dbc.Button:
+    return dbc.Button(
+        [html.I(className=f"bi {icon} me-2"), label],
+        id=button_id,
+        color="primary",
+        size="sm",
+        className="shadow-sm",
+        style={
+            "fontWeight": "700",
+            "borderRadius": "999px",
+            "padding": "6px 14px",
+            "border": "1px solid rgba(255,255,255,0.1)",
+            "background": "linear-gradient(135deg, #FF6B35 0%, #FF8A3D 100%)",
+            "color": "white",
+        },
+    )
 
 
 def create_navbar() -> html.Div:
-    """返回顶部导航栏布局（Monarch 风格）。"""
     return html.Div(
         className="dvs-topbar",
         children=[
-            # ── 左侧：页面标题 + 系统状态面板 ──
             html.Div(
                 className="dvs-topbar__left",
-                style={
-                    "display": "flex",
-                    "alignItems": "center",
-                    "gap": "16px",
-                    "flex": "1",
-                    "overflow": "hidden",
-                },
+                style={"display": "flex", "alignItems": "center", "gap": "16px", "flex": "1", "overflow": "hidden"},
                 children=[
-                    # 页面标题
                     html.Span(
                         id="topbar-page-title",
                         style={
                             "fontSize": "1rem",
-                            "fontWeight": "600",
+                            "fontWeight": "700",
                             "color": "var(--text-primary)",
                             "whiteSpace": "nowrap",
                         },
                     ),
-                    # 分隔线
                     html.Div(style={"width": "1px", "height": "20px", "background": "var(--border)", "flexShrink": "0"}),
-                    # 系统状态面板（OpenWrt 风格）
+                    html.Div(
+                        className="d-flex align-items-center",
+                        style={"gap": "10px", "flexShrink": "0"},
+                        children=[
+                            dcc.Upload(
+                                id="project-upload",
+                                accept=PROJECT_EXTENSION,
+                                children=_project_button("打开项目", "bi-folder2-open", "btn-open-project"),
+                            ),
+                            _project_button("保存项目", "bi-save", "btn-save-project"),
+                        ],
+                    ),
                     html.Div(
                         id="topbar-sysinfo",
                         style={
@@ -63,9 +67,7 @@ def create_navbar() -> html.Div:
                             "flexWrap": "nowrap",
                             "overflow": "hidden",
                         },
-                        children=[],  # 由 callback 动态渲染
                     ),
-                    # 数据集徽章区（动态更新）
                     html.Div(
                         id="topbar-status-badges",
                         style={"display": "flex", "alignItems": "center", "gap": "8px"},
@@ -73,36 +75,15 @@ def create_navbar() -> html.Div:
                     ),
                 ],
             ),
-
-            # dcc.Interval 每1秒刷新系统状态
             dcc.Interval(id="sysinfo-interval", interval=1000, n_intervals=0),
-
-
-            # ── 右侧：操作按钮区 ──
             html.Div(
                 className="dvs-topbar__actions",
                 children=[
-                    dcc.Upload(
-                        id="project-upload",
-                        accept=".dvsp",
-                        children=html.Button(
-                            [html.I(className="bi bi-folder2-open"), html.Span("项目", className="ms-1 d-none d-md-inline")],
-                            id="btn-open-project",
-                            className="dvs-topbar__btn btn-hover",
-                            title="打开项目",
-                        ),
-                    ),
-                    html.Button(
-                        [html.I(className="bi bi-save"), html.Span("保存", className="ms-1 d-none d-md-inline")],
-                        id="btn-save-project",
-                        className="dvs-topbar__btn btn-hover",
-                        title="保存项目",
-                    ),
                     html.Button(
                         html.I(className="bi bi-lightning"),
                         id="btn-quick-action",
                         className="dvs-topbar__btn btn-hover",
-                        title="快捷操作",
+                        title="快速操作",
                     ),
                     html.Button(
                         html.I(className="bi bi-moon-stars"),
@@ -121,47 +102,88 @@ def create_navbar() -> html.Div:
                         href="https://github.com/wsyh4567/DATAVIZ-STUDIO",
                         target="_blank",
                         className="dvs-topbar__btn btn-hover",
-                        title="帮助文档 (GitHub)",
+                        title="帮助文档",
                         style={"textDecoration": "none"},
                     ),
                 ],
             ),
-
-
-            # 关于弹窗
-            dbc.Modal([
-                dbc.ModalHeader(dbc.ModalTitle("关于 DataViz Studio")),
-                dbc.ModalBody([
-                    html.P([html.Strong("版本: "), config.APP_VERSION]),
-                    html.P([html.Strong("框架: "), "Dash + Plotly + Pandas"]),
-                    html.P([html.Strong("许可: "), "MIT License"]),
-                    html.Hr(),
-                    html.P(config.APP_DESCRIPTION, style={"color": "var(--text-muted)"}),
-                ]),
-            ], id="settings-modal", is_open=False, centered=True),
-
+            dbc.Modal(
+                [
+                    dbc.ModalHeader(dbc.ModalTitle("关于 DataViz Studio")),
+                    dbc.ModalBody(
+                        [
+                            html.P([html.Strong("版本: "), config.APP_VERSION]),
+                            html.P([html.Strong("技术栈: "), "Dash + Plotly + Pandas"]),
+                            html.P([html.Strong("协议: "), "MIT License"]),
+                            html.Hr(),
+                            html.P(config.APP_DESCRIPTION, style={"color": "var(--text-muted)"}),
+                        ]
+                    ),
+                ],
+                id="settings-modal",
+                is_open=False,
+                centered=True,
+            ),
             dbc.Modal(
                 [
                     dbc.ModalHeader(dbc.ModalTitle("保存项目")),
                     dbc.ModalBody(
                         [
-                            dbc.Label("项目名称"),
-                            dbc.Input(id="project-name-input", value="dataviz-project", placeholder="输入项目名称"),
-                            dbc.Label("数据保存方式", className="mt-3"),
+                            dbc.Label("项目文件名"),
+                            dbc.Input(
+                                id="project-name-input",
+                                value="dataviz-project",
+                                placeholder="输入项目名称",
+                            ),
+                            html.Div(
+                                className="d-flex align-items-center mt-3",
+                                style={"gap": "8px"},
+                                children=[
+                                    dbc.Label("项目里要不要带上数据", className="mb-0"),
+                                    html.Span(
+                                        "?",
+                                        id="project-storage-mode-help",
+                                        style={
+                                            "display": "inline-flex",
+                                            "alignItems": "center",
+                                            "justifyContent": "center",
+                                            "width": "18px",
+                                            "height": "18px",
+                                            "borderRadius": "999px",
+                                            "background": "var(--bg-tertiary, #EDF2F7)",
+                                            "fontSize": "0.75rem",
+                                            "fontWeight": "700",
+                                            "cursor": "help",
+                                        },
+                                    ),
+                                ],
+                            ),
                             dbc.RadioItems(
                                 id="project-storage-mode",
+                                className="mt-2",
                                 options=[
-                                    {"label": "内嵌数据", "value": "embedded"},
-                                    {"label": "仅保存引用", "value": "reference"},
+                                    {"label": "内嵌数据（换台机器也能直接打开）", "value": "embedded"},
+                                    {"label": "仅保存引用（项目更小，优先重新读取原始来源）", "value": "reference"},
                                 ],
                                 value="embedded",
+                            ),
+                            html.Div(
+                                f"导出格式：{PROJECT_EXTENSION} 项目文件",
+                                className="small mt-3",
+                                style={"color": "var(--text-muted)"},
+                            ),
+                            dbc.Tooltip(
+                                "内嵌数据会把当前数据集一起写进项目文件；仅保存引用会优先记录原始文件、URL 或内置样本来源。"
+                                " 如果某个数据集无法可靠重新定位，会自动改成内嵌保存，避免项目再次打开时丢数据。",
+                                target="project-storage-mode-help",
+                                placement="right",
                             ),
                         ]
                     ),
                     dbc.ModalFooter(
                         [
                             dbc.Button("取消", id="btn-cancel-save-project", color="secondary", outline=True),
-                            dbc.Button("保存", id="btn-confirm-save-project", color="primary"),
+                            dbc.Button("导出项目", id="btn-confirm-save-project", color="primary"),
                         ]
                     ),
                 ],
@@ -169,52 +191,21 @@ def create_navbar() -> html.Div:
                 is_open=False,
                 centered=True,
             ),
-
-            # 快速操作 Offcanvas 右侧滑出面板
             dbc.Offcanvas(
                 id="quick-action-offcanvas",
-                title=html.Div([
-                    html.Div(
-                        style={
-                            "width": "28px", "height": "28px", "borderRadius": "7px",
-                            "background": "rgba(255, 107, 53, 0.12)", "display": "inline-flex",
-                            "alignItems": "center", "justifyContent": "center", "marginRight": "8px",
-                        },
-                        children=[html.I(className="bi bi-lightning-fill", style={"color": "#FF6B35", "fontSize": "0.9rem"})],
-                    ),
-                    "快速操作",
-                ]),
+                title="快速操作",
                 is_open=False,
                 placement="end",
                 style={"width": "360px"},
                 className="dvs-offcanvas-quick",
                 children=[
-                    html.P("快速导航到常用功能", style={"color": "#718096", "fontSize": "0.8rem", "marginBottom": "16px"}),
-
-                    # 快速操作项目列表
+                    html.P("快速跳到常用分析入口。", style={"color": "#718096", "fontSize": "0.8rem", "marginBottom": "16px"}),
                     html.A(
                         className="dvs-quick-action-item",
                         href="/data",
                         children=[
-                            html.Div(className="dvs-quick-action-item__icon",
-                                     children=[html.I(className="bi bi-server")]),
-                            html.Div([
-                                html.Div("上传 / 加载数据", className="dvs-quick-action-item__label"),
-                                html.Div("支持 CSV、Excel、JSON、Parquet", className="dvs-quick-action-item__sub"),
-                            ]),
-                            html.I(className="bi bi-chevron-right ms-auto", style={"color": "#CBD5E0"}),
-                        ],
-                    ),
-                    html.A(
-                        className="dvs-quick-action-item",
-                        href="/charts",
-                        children=[
-                            html.Div(className="dvs-quick-action-item__icon",
-                                     children=[html.I(className="bi bi-graph-up")]),
-                            html.Div([
-                                html.Div("创建图表", className="dvs-quick-action-item__label"),
-                                html.Div("30+ 种可视化图表，智能推荐", className="dvs-quick-action-item__sub"),
-                            ]),
+                            html.Div(className="dvs-quick-action-item__icon", children=[html.I(className="bi bi-server")]),
+                            html.Div([html.Div("加载数据", className="dvs-quick-action-item__label"), html.Div("CSV / Excel / JSON / Parquet", className="dvs-quick-action-item__sub")]),
                             html.I(className="bi bi-chevron-right ms-auto", style={"color": "#CBD5E0"}),
                         ],
                     ),
@@ -222,60 +213,33 @@ def create_navbar() -> html.Div:
                         className="dvs-quick-action-item",
                         href="/workshop",
                         children=[
-                            html.Div(className="dvs-quick-action-item__icon",
-                                     children=[html.I(className="bi bi-hammer")]),
-                            html.Div([
-                                html.Div("数据清洗", className="dvs-quick-action-item__label"),
-                                html.Div("拖拽式操作，支持撤销/重做", className="dvs-quick-action-item__sub"),
-                            ]),
+                            html.Div(className="dvs-quick-action-item__icon", children=[html.I(className="bi bi-hammer")]),
+                            html.Div([html.Div("数据清洗", className="dvs-quick-action-item__label"), html.Div("拖拽式步骤、支持撤销和导出", className="dvs-quick-action-item__sub")]),
                             html.I(className="bi bi-chevron-right ms-auto", style={"color": "#CBD5E0"}),
                         ],
                     ),
                     html.A(
                         className="dvs-quick-action-item",
-                        href="/stats",
+                        href="/charts",
                         children=[
-                            html.Div(className="dvs-quick-action-item__icon",
-                                     children=[html.I(className="bi bi-calculator")]),
-                            html.Div([
-                                html.Div("统计分析", className="dvs-quick-action-item__label"),
-                                html.Div("假设检验、相关分析、分组统计", className="dvs-quick-action-item__sub"),
-                            ]),
+                            html.Div(className="dvs-quick-action-item__icon", children=[html.I(className="bi bi-graph-up")]),
+                            html.Div([html.Div("创建图表", className="dvs-quick-action-item__label"), html.Div("Plotly / Seaborn 图表和代码导出", className="dvs-quick-action-item__sub")]),
                             html.I(className="bi bi-chevron-right ms-auto", style={"color": "#CBD5E0"}),
                         ],
                     ),
                     html.A(
                         className="dvs-quick-action-item",
-                        href="/profiling",
+                        href="/advanced",
                         children=[
-                            html.Div(className="dvs-quick-action-item__icon",
-                                     children=[html.I(className="bi bi-file-earmark-bar-graph")]),
-                            html.Div([
-                                html.Div("数据概况报告", className="dvs-quick-action-item__label"),
-                                html.Div("自动数据质量评分与分布分析", className="dvs-quick-action-item__sub"),
-                            ]),
+                            html.Div(className="dvs-quick-action-item__icon", children=[html.I(className="bi bi-tools")]),
+                            html.Div([html.Div("高级工具", className="dvs-quick-action-item__label"), html.Div("聚合导出当前项目上下文", className="dvs-quick-action-item__sub")]),
                             html.I(className="bi bi-chevron-right ms-auto", style={"color": "#CBD5E0"}),
                         ],
                     ),
-                    html.A(
-                        className="dvs-quick-action-item",
-                        href="/dashboard",
-                        children=[
-                            html.Div(className="dvs-quick-action-item__icon",
-                                     children=[html.I(className="bi bi-speedometer2")]),
-                            html.Div([
-                                html.Div("仪表盘", className="dvs-quick-action-item__label"),
-                                html.Div("数据集指标总览与质量评分", className="dvs-quick-action-item__sub"),
-                            ]),
-                            html.I(className="bi bi-chevron-right ms-auto", style={"color": "#CBD5E0"}),
-                        ],
-                    ),
-
-                    # 底部提示
                     html.Hr(style={"margin": "16px 0", "borderColor": "#E8EDF2"}),
                     html.Div(
                         style={"textAlign": "center", "color": "#A0AEC0", "fontSize": "0.75rem"},
-                        children=["DataViz Studio  v", config.APP_VERSION],
+                        children=["DataViz Studio v", config.APP_VERSION],
                     ),
                 ],
             ),
