@@ -18,7 +18,6 @@ from services.data_workshop.step_manager import StepManager
 from services.data_workshop.undo_redo_stack import UndoRedoStack
 from services.data_workshop.operation_executor import OperationExecutor
 from services.data_workshop.code_generator import CodeGenerator
-from services.export_service import build_workshop_export
 from components.data_workshop.data_grid import create_data_grid, create_data_stats
 from components.data_workshop.step_panel import create_step_panel, create_step_header, create_step_actions
 from components.data_workshop.toolbar import create_operation_toolbar
@@ -136,10 +135,9 @@ def layout():
                         ]),
                         dbc.Button([html.I(className="bi bi-clipboard me-1"), "复制代码"],
                                    id="btn-copy-code", color="primary", size="sm", outline=True, className="mt-2 btn-hover w-100"),
+                        dcc.Download(id="download-code-file"),
                         dbc.Button([html.I(className="bi bi-download me-1"), "下载 .py"],
                                    id="btn-download-inline-code", color="success", size="sm", outline=True, className="mt-2 btn-hover w-100"),
-                                   dbc.Button([html.I(className="bi bi-journal-code me-1"), "Export .ipynb"],
-                                              id="btn-download-inline-notebook", color="info", size="sm", outline=True, className="mt-2 btn-hover w-100"),
                     ], title="💻 Python 导出代码", item_id="tab-code")
                 ], active_item="tab-pipeline", id="workshop-sidebar-accordion", start_collapsed=False)
             ], id="left-drawer",
@@ -223,8 +221,7 @@ def layout():
 
         # 下载组件
         dcc.Download(id='download-code'),
-        dcc.Download(id='download-workshop-py-file'),
-        dcc.Download(id='download-workshop-ipynb-file'),
+        dcc.Download(id='download-code-file'),
 
         # 状态提示
         html.Div(id='copy-code-status', style={'display': 'none'}),
@@ -1240,34 +1237,6 @@ def handle_code_preview(pipeline):
     })
 
     return inline_display
-
-
-@callback(
-    Output('download-workshop-py-file', 'data'),
-    Input('btn-download-inline-code', 'n_clicks'),
-    State('pipeline-store', 'data'),
-    prevent_initial_call=True
-)
-def download_workshop_python(n_clicks, pipeline):
-    if not n_clicks:
-        return no_update
-
-    bundle = build_workshop_export(pipeline or [])
-    return dcc.send_string(bundle.py_content, filename=bundle.py_filename)
-
-
-@callback(
-    Output('download-workshop-ipynb-file', 'data'),
-    Input('btn-download-inline-notebook', 'n_clicks'),
-    State('pipeline-store', 'data'),
-    prevent_initial_call=True
-)
-def download_workshop_notebook(n_clicks, pipeline):
-    if not n_clicks:
-        return no_update
-
-    bundle = build_workshop_export(pipeline or [])
-    return dict(content=bundle.ipynb_content, filename=bundle.ipynb_filename)
 
 # ============================================================================
 # 高级过滤联动配置回调 (Power Query Style)
