@@ -90,6 +90,52 @@ def _build_notebook_content(code: str, chart_config: dict | None) -> str:
     return json.dumps(notebook, ensure_ascii=False, indent=2)
 
 
+def _render_chart_from_state(fig_data, chart_config):
+    if not fig_data or not chart_config:
+        return no_update
+    library = chart_config.get("library")
+    if library == "plotly":
+        try:
+            figure = json.loads(fig_data) if isinstance(fig_data, str) else fig_data
+        except Exception:
+            return html.Div("图表恢复失败", className="text-danger")
+        return dcc.Graph(
+            figure=figure,
+            config={"displayModeBar": True, "displaylogo": False},
+            style={"height": "100%"},
+        )
+    if library == "seaborn":
+        return html.Img(
+            src=fig_data,
+            style={"width": "100%", "maxHeight": "500px", "objectFit": "contain"},
+        )
+    return no_update
+
+
+def _build_editor_prefill(item: dict | None) -> dict | None:
+    normalized = _normalize_saved_chart(item)
+    if not normalized:
+        return None
+
+    config = normalized.get("config") or {}
+    params = dict(config.get("params") or {})
+    params.setdefault("title", config.get("title"))
+    params.setdefault("template", "plotly_white")
+    params.setdefault("color_scale", "")
+    params.setdefault("show_legend", True)
+    params.setdefault("show_grid", True)
+    params.setdefault("opacity", 1.0)
+
+    return {
+        "pending": True,
+        "library": normalized.get("library") or config.get("library") or "plotly",
+        "chart_type": normalized.get("chart_type"),
+        "params": params,
+        "figure": normalized.get("figure"),
+        "config": config,
+    }
+
+
 
 def create_chart_studio_page() -> html.Div:
     """创建图表工作室页面"""
@@ -287,6 +333,7 @@ def create_chart_studio_page() -> html.Div:
         dcc.Store(id='chart-data-store'),
         dcc.Store(id='chart-figure-store'),
         dcc.Store(id='saved-charts-store', storage_type='local', data=[]),  # 画廊本地存储
+        dcc.Store(id='chart-editor-prefill-store', data=None),
         dcc.Download(id='download-chart-file'),
         dcc.Download(id='download-jupyter-file'),
 
@@ -315,8 +362,9 @@ def create_chart_studio_page() -> html.Div:
     ], id='chart-studio-page')
 
 
-def _create_style_panel() -> html.Div:
+def _create_style_panel(defaults: dict | None = None) -> html.Div:
     """创建图表样式配置区域"""
+    defaults = defaults or {}
     return html.Div([
         html.Hr(),
         html.H6("图表样式", className="mb-3 mt-2"),
@@ -328,6 +376,7 @@ def _create_style_panel() -> html.Div:
                 id='style-title',
                 type='text',
                 placeholder='输入图表标题（可选）',
+                value=defaults.get('title'),
                 size='sm',
                 className='mb-2'
             ),
@@ -343,7 +392,7 @@ def _create_style_panel() -> html.Div:
                     {'label': '极简无边界', 'value': 'simple_white'},
                     {'label': '暗黑主题', 'value': 'plotly_dark'}
                 ],
-                value='plotly_white',
+                value=defaults.get('template', 'plotly_white'),
                 clearable=False,
                 className='mb-2'
             ),
@@ -365,7 +414,7 @@ def _create_style_panel() -> html.Div:
                     {'label': 'Bluered', 'value': 'Bluered'},
                     {'label': 'Rainbow', 'value': 'Rainbow'},
                 ],
-                value='',
+                value=defaults.get('color_scale', ''),
                 clearable=True,
                 className='mb-2'
             ),
@@ -376,7 +425,7 @@ def _create_style_panel() -> html.Div:
             dbc.Checkbox(
                 id='style-show-legend',
                 label='显示图例',
-                value=True,
+                value=defaults.get('show_legend', True),
                 className='mb-2'
             ),
         ]),
@@ -386,7 +435,7 @@ def _create_style_panel() -> html.Div:
             dbc.Checkbox(
                 id='style-show-grid',
                 label='显示网格',
-                value=True,
+                value=defaults.get('show_grid', True),
                 className='mb-2'
             ),
         ]),
@@ -400,7 +449,7 @@ def _create_style_panel() -> html.Div:
                 id='style-opacity',
                 type='number',
                 min=0.1, max=1.0, step=0.1,
-                value=1.0,
+                value=defaults.get('opacity', 1.0),
                 size='sm',
                 className='mb-2'
             ),
@@ -414,6 +463,7 @@ def _create_style_panel() -> html.Div:
                     id='style-width',
                     type='number',
                     placeholder='自动',
+                    value=defaults.get('width'),
                     size='sm',
                     className='mb-2'
                 ),
@@ -424,6 +474,7 @@ def _create_style_panel() -> html.Div:
                     id='style-height',
                     type='number',
                     placeholder='自动',
+                    value=defaults.get('height'),
                     size='sm',
                     className='mb-2'
                 ),
@@ -432,8 +483,9 @@ def _create_style_panel() -> html.Div:
     ])
 
 
-def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
+def create_plotly_params_panel(df: pd.DataFrame, defaults: dict | None = None) -> html.Div:
     """创建 Plotly 参数配置面板"""
+    defaults = defaults or {}
     columns = get_labeled_options(df)
 
     return html.Div([
@@ -445,6 +497,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-x',
                 options=columns,
+                value=defaults.get('x'),
                 placeholder='选择X轴字段',
                 className='mb-2'
             ),
@@ -455,13 +508,14 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-y',
                 options=columns,
+                value=defaults.get('y'),
                 placeholder='选择Y轴字段',
                 className='mb-2'
             ),
             dbc.Checkbox(
                 id='param-secondary-y-check',
                 label='启用双 Y 轴',
-                value=False,
+                value=bool(defaults.get('secondary_y')),
                 className='mb-1 mt-2',
                 style={'fontSize': '12px', 'color': 'var(--text-muted)'}
             ),
@@ -469,6 +523,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 dcc.Dropdown(
                     id='param-secondary-y-col',
                     options=columns,
+                    value=defaults.get('secondary_y'),
                     placeholder='选择额外 Y 轴列',
                     className='mb-2',
                     clearable=True
@@ -481,6 +536,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-z',
                 options=columns,
+                value=defaults.get('z'),
                 placeholder='选择Z轴字段',
                 clearable=True,
                 className='mb-2'
@@ -492,6 +548,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-color',
                 options=columns,
+                value=defaults.get('color'),
                 placeholder='选择颜色字段（可选）',
                 clearable=True,
                 className='mb-2'
@@ -503,6 +560,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-size',
                 options=columns,
+                value=defaults.get('size'),
                 placeholder='选择大小字段（可选）',
                 clearable=True,
                 className='mb-2'
@@ -514,6 +572,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-text',
                 options=columns,
+                value=defaults.get('text'),
                 placeholder='选择图形上的悬停/常显文本',
                 clearable=True,
                 className='mb-2'
@@ -538,6 +597,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 dcc.Dropdown(
                     id='param-hover-data',
                     options=columns,
+                    value=defaults.get('hover_data'),
                     placeholder='选择悬停字段（可多选）',
                     multi=True,
                     className='mb-2'
@@ -549,6 +609,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 dcc.Dropdown(
                     id='param-facet-row',
                     options=columns,
+                    value=defaults.get('facet_row'),
                     placeholder='选择分面行字段（可选）',
                     clearable=True,
                     className='mb-2'
@@ -560,6 +621,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 dcc.Dropdown(
                     id='param-facet-col',
                     options=columns,
+                    value=defaults.get('facet_col'),
                     placeholder='选择分面列字段（可选）',
                     clearable=True,
                     className='mb-2'
@@ -571,6 +633,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                 dcc.Dropdown(
                     id='param-animation-frame',
                     options=columns,
+                    value=defaults.get('animation_frame'),
                     placeholder='选择动画帧字段（可选）',
                     clearable=True,
                     className='mb-2'
@@ -585,6 +648,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                         {'label': 'OLS回归', 'value': 'ols'},
                         {'label': 'LOWESS平滑', 'value': 'lowess'},
                     ],
+                    value=defaults.get('trendline'),
                     placeholder='选择趋势线类型（可选）',
                     clearable=True,
                     className='mb-2'
@@ -600,6 +664,7 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                         {'label': '箱线图', 'value': 'box'},
                         {'label': '小提琴图', 'value': 'violin'},
                     ],
+                    value=defaults.get('marginal_x'),
                     placeholder='选择X轴边际图（可选）',
                     clearable=True,
                     className='mb-2'
@@ -615,29 +680,33 @@ def create_plotly_params_panel(df: pd.DataFrame) -> html.Div:
                         {'label': '箱线图', 'value': 'box'},
                         {'label': '小提琴图', 'value': 'violin'},
                     ],
+                    value=defaults.get('marginal_y'),
                     placeholder='选择Y轴边际图（可选）',
                     clearable=True,
                     className='mb-2'
                 ),
             ], id='wrapper-param-marginal-y'),
 
-        ], id='advanced-params-collapse', is_open=False),
+        ], id='advanced-params-collapse', is_open=any(defaults.get(key) for key in (
+            'hover_data', 'facet_row', 'facet_col', 'animation_frame', 'trendline', 'marginal_x', 'marginal_y'
+        ))),
 
         # ── 隐藏占位符：generate_chart 回调 Input 需要这些 ID 存在 ──
         html.Div([
-            dcc.Dropdown(id='param-palette', value=None),
-            dcc.Dropdown(id='param-style', value=None),
+            dcc.Dropdown(id='param-palette', value=defaults.get('palette')),
+            dcc.Dropdown(id='param-style', value=defaults.get('style')),
         ], style={'display': 'none'}),
 
         # 图表样式
-        _create_style_panel(),
+        _create_style_panel(defaults),
 
     ], className='params-panel')
 
 
 
-def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
+def create_seaborn_params_panel(df: pd.DataFrame, defaults: dict | None = None) -> html.Div:
     """创建 Seaborn 参数配置面板"""
+    defaults = defaults or {}
     columns = get_labeled_options(df)
 
     return html.Div([
@@ -648,6 +717,7 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-x',
                 options=columns,
+                value=defaults.get('x'),
                 placeholder='选择X轴字段',
                 className='mb-2'
             ),
@@ -658,13 +728,14 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-y',
                 options=columns,
+                value=defaults.get('y'),
                 placeholder='选择Y轴字段',
                 className='mb-2'
             ),
             dbc.Checkbox(
                 id='param-secondary-y-check',
                 label='启用辅助 Y 轴 (双Y坐标轴)',
-                value=False,
+                value=bool(defaults.get('secondary_y')),
                 className='mb-1 mt-2',
                 style={'fontSize': '12px', 'color': 'var(--text-muted)'}
             ),
@@ -672,6 +743,7 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
                 dcc.Dropdown(
                     id='param-secondary-y-col',
                     options=columns,
+                    value=defaults.get('secondary_y'),
                     placeholder='选择额外的数值字段...',
                     className='mb-2',
                     clearable=True
@@ -684,6 +756,7 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-color',  # 统一为 param-color，与 Plotly 面板及 generate_chart 回调 Input 保持一致
                 options=columns,
+                value=defaults.get('color') or defaults.get('hue'),
                 placeholder='选择颜色字段（可选）',
                 clearable=True,
                 className='mb-2'
@@ -695,6 +768,7 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-size',
                 options=columns,
+                value=defaults.get('size'),
                 placeholder='选择大小字段（可选）',
                 clearable=True,
                 className='mb-2'
@@ -706,6 +780,7 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
             dcc.Dropdown(
                 id='param-style',
                 options=columns,
+                value=defaults.get('style'),
                 placeholder='选择样式字段（可选）',
                 clearable=True,
                 className='mb-2'
@@ -728,7 +803,7 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
                     {'label': 'viridis', 'value': 'viridis'},
                     {'label': 'plasma', 'value': 'plasma'},
                 ],
-                value='deep',
+                value=defaults.get('palette', 'deep'),
                 clearable=False,
                 className='mb-2'
             ),
@@ -739,19 +814,19 @@ def create_seaborn_params_panel(df: pd.DataFrame) -> html.Div:
         # 但 Dash 回调机制要求所有 Input 组件必须在 DOM 中，
         # 否则回调会静默失败。以下隐藏 Dropdown 确保 ID 可达。
         html.Div([
-            dcc.Dropdown(id='param-z', value=None),
-            dcc.Dropdown(id='param-text', value=None),
-            dcc.Dropdown(id='param-hover-data', value=None),
-            dcc.Dropdown(id='param-facet-row', value=None),
-            dcc.Dropdown(id='param-facet-col', value=None),
-            dcc.Dropdown(id='param-animation-frame', value=None),
-            dcc.Dropdown(id='param-trendline', value=None),
-            dcc.Dropdown(id='param-marginal-x', value=None),
-            dcc.Dropdown(id='param-marginal-y', value=None),
+            dcc.Dropdown(id='param-z', value=defaults.get('z')),
+            dcc.Dropdown(id='param-text', value=defaults.get('text')),
+            dcc.Dropdown(id='param-hover-data', value=defaults.get('hover_data')),
+            dcc.Dropdown(id='param-facet-row', value=defaults.get('facet_row')),
+            dcc.Dropdown(id='param-facet-col', value=defaults.get('facet_col')),
+            dcc.Dropdown(id='param-animation-frame', value=defaults.get('animation_frame')),
+            dcc.Dropdown(id='param-trendline', value=defaults.get('trendline')),
+            dcc.Dropdown(id='param-marginal-x', value=defaults.get('marginal_x')),
+            dcc.Dropdown(id='param-marginal-y', value=defaults.get('marginal_y')),
         ], style={'display': 'none'}),
 
         # 图表样式
-        _create_style_panel(),
+        _create_style_panel(defaults),
 
     ], className='params-panel')
 
@@ -774,14 +849,22 @@ def toggle_secondary_y(is_checked):
      Output('params-panel-container', 'children'),
      Output('library-info', 'children')],
     Input('chart-library-selector', 'value'),
+    Input('chart-editor-prefill-store', 'data'),
 )
-def switch_library(library):
+def switch_library(library, editor_prefill):
     """切换图表库时更新参数面板"""
+    if ctx.triggered_id == 'chart-editor-prefill-store' and (not isinstance(editor_prefill, dict) or not editor_prefill.get('pending')):
+        return no_update, no_update, no_update
+
     dm = DataManager()
     df = dm.active_df
 
     if df is None or df.empty:
         return [], html.Div("请先加载数据"), ""
+
+    defaults = {}
+    if isinstance(editor_prefill, dict) and editor_prefill.get('pending') and editor_prefill.get('library') == library:
+        defaults = editor_prefill.get('params') or {}
 
     if library == 'plotly':
         options = []
@@ -795,14 +878,14 @@ def switch_library(library):
         for category, items in categories.items():
             options.extend(items)
 
-        params_panel = create_plotly_params_panel(df)
+        params_panel = create_plotly_params_panel(df, defaults)
         info = "Plotly：交互式图表，支持缩放、悬停、动画等功能"
     else:
         options = []
         for chart_type, info_item in SEABORN_CHART_TYPES.items():
             options.append({'label': f"{info_item['name']} [{info_item['category']}]", 'value': chart_type.value if hasattr(chart_type, 'value') else chart_type})
 
-        params_panel = create_seaborn_params_panel(df)
+        params_panel = create_seaborn_params_panel(df, defaults)
         info = "Seaborn：静态图表，更美观的默认样式，适合出版和报告"
 
     return options, params_panel, info
@@ -1330,13 +1413,76 @@ def update_gallery(saved_data):
                 html.Div([
                     dbc.Badge(library.capitalize(), color="primary" if library == "plotly" else "info", className="me-2"),
                     html.Small(item.get('timestamp', ''), className="text-muted")
-                ], className="d-flex justify-content-between align-items-center mt-2")
+                ], className="d-flex justify-content-between align-items-center mt-2"),
+                dbc.Button(
+                    [html.I(className="bi bi-pencil-square me-2"), "继续编辑"],
+                    id={"type": "gallery-edit-chart", "index": item["id"]},
+                    color="primary",
+                    outline=True,
+                    size="sm",
+                    className="mt-3 w-100 btn-hover",
+                ),
             ], className="p-3")
         ], className="h-100 shadow-sm", style={"border": "1px solid var(--border)", "backgroundColor": "var(--bg-secondary)"})
 
         cards.append(dbc.Col(card, xs=12, sm=6, md=6, lg=4, xl=3, className="mb-4"))
 
     return dbc.Row(cards)
+
+
+@callback(
+    Output("chart-studio-tabs", "active_tab", allow_duplicate=True),
+    Output("chart-library-selector", "value", allow_duplicate=True),
+    Output("chart-type-selector", "value", allow_duplicate=True),
+    Output("chart-editor-prefill-store", "data", allow_duplicate=True),
+    Output("chart-figure-store", "data", allow_duplicate=True),
+    Output("chart-data-store", "data", allow_duplicate=True),
+    Output("chart-container", "children", allow_duplicate=True),
+    Input({"type": "gallery-edit-chart", "index": ALL}, "n_clicks"),
+    State("saved-charts-store", "data"),
+    prevent_initial_call=True,
+)
+def load_chart_from_gallery(_, saved_data):
+    if not ctx.triggered_id:
+        return (no_update,) * 7
+
+    chart_id = ctx.triggered_id.get("index")
+    normalized_saved = []
+    if isinstance(saved_data, list):
+        normalized_saved = [item for item in (_normalize_saved_chart(entry) for entry in saved_data) if item]
+
+    selected = next((item for item in normalized_saved if item.get("id") == chart_id), None)
+    if not selected:
+        return (no_update,) * 7
+
+    prefill = _build_editor_prefill(selected)
+    if not prefill:
+        return (no_update,) * 7
+
+    return (
+        "tab-explore",
+        prefill.get("library"),
+        prefill.get("chart_type"),
+        prefill,
+        prefill.get("figure"),
+        prefill.get("config"),
+        _render_chart_from_state(prefill.get("figure"), prefill.get("config")),
+    )
+
+
+@callback(
+    Output("chart-editor-prefill-store", "data", allow_duplicate=True),
+    Input("params-panel-container", "children"),
+    State("chart-editor-prefill-store", "data"),
+    prevent_initial_call=True,
+)
+def clear_gallery_prefill(_, prefill):
+    if not isinstance(prefill, dict) or not prefill.get("pending"):
+        return no_update
+
+    cleared = dict(prefill)
+    cleared["pending"] = False
+    return cleared
 
 
 @callback(
@@ -1448,3 +1594,61 @@ def download_ai_report(n_clicks, ai_content):
     if not n_clicks or not ai_content:
         return no_update
     return dcc.send_string(ai_content, "图表智能分析报告.md")
+
+
+@callback(
+    Output("project-page-store", "data", allow_duplicate=True),
+    Input("chart-studio-tabs", "active_tab"),
+    Input("chart-library-selector", "value"),
+    Input("chart-type-selector", "value"),
+    Input("style-title", "value"),
+    Input("chart-figure-store", "data"),
+    Input("chart-data-store", "data"),
+    Input("saved-charts-store", "data"),
+    State("project-page-store", "data"),
+    prevent_initial_call=True,
+)
+def sync_chart_project_state(active_tab, library, chart_type, title, figure_data, chart_data, saved_charts, project_state):
+    state = dict(project_state or {})
+    state["chart_studio"] = {
+        "active_tab": active_tab or "tab-explore",
+        "library": library or "plotly",
+        "chart_type": chart_type,
+        "title": title,
+        "figure_data": figure_data,
+        "chart_data": chart_data,
+        "saved_charts": saved_charts or [],
+    }
+    return state
+
+
+@callback(
+    Output("chart-studio-tabs", "active_tab", allow_duplicate=True),
+    Output("chart-library-selector", "value", allow_duplicate=True),
+    Output("chart-type-selector", "value", allow_duplicate=True),
+    Output("style-title", "value", allow_duplicate=True),
+    Output("chart-figure-store", "data", allow_duplicate=True),
+    Output("chart-data-store", "data", allow_duplicate=True),
+    Output("saved-charts-store", "data", allow_duplicate=True),
+    Output("chart-container", "children", allow_duplicate=True),
+    Input("project-restore-store", "data"),
+    Input("url", "pathname"),
+    prevent_initial_call=True,
+)
+def restore_chart_project_state(project_restore, pathname):
+    if pathname != "/charts" or not project_restore:
+        return (no_update,) * 8
+
+    page_state = (project_restore.get("page_state") or {}).get("chart_studio")
+    if not page_state:
+        return (no_update,) * 8
+
+    active_tab = page_state.get("active_tab", "tab-explore")
+    library = page_state.get("library", "plotly")
+    chart_type = page_state.get("chart_type")
+    title = page_state.get("title")
+    figure_data = page_state.get("figure_data")
+    chart_data = page_state.get("chart_data")
+    saved_charts = page_state.get("saved_charts", [])
+    chart_component = _render_chart_from_state(figure_data, chart_data)
+    return active_tab, library, chart_type, title, figure_data, chart_data, saved_charts, chart_component

@@ -1338,3 +1338,56 @@ def toggle_left_drawer(n_clicks, current_style):
         new_style["padding"] = "0"
         
     return new_style
+
+
+@callback(
+    Output("project-page-store", "data", allow_duplicate=True),
+    Input("original-data-store", "data"),
+    Input("preview-data-store", "data"),
+    Input("pipeline-store", "data"),
+    Input("undo-redo-store", "data"),
+    State("project-page-store", "data"),
+    prevent_initial_call=True,
+)
+def sync_workshop_project_state(original_data, preview_data, pipeline, undo_redo_state, project_state):
+    state = dict(project_state or {})
+    state["data_workshop"] = {
+        "original_data": original_data,
+        "preview_data": preview_data,
+        "pipeline": pipeline or [],
+        "undo_redo_state": undo_redo_state or {"can_undo": False, "can_redo": False},
+    }
+    return state
+
+
+@callback(
+    Output("original-data-store", "data", allow_duplicate=True),
+    Output("preview-data-store", "data", allow_duplicate=True),
+    Output("pipeline-store", "data", allow_duplicate=True),
+    Output("undo-redo-store", "data", allow_duplicate=True),
+    Output("data-table-container", "children", allow_duplicate=True),
+    Output("data-stats", "children", allow_duplicate=True),
+    Input("project-restore-store", "data"),
+    Input("url", "pathname"),
+    prevent_initial_call=True,
+)
+def restore_workshop_project_state(project_restore, pathname):
+    if pathname != "/workshop" or not project_restore:
+        return no_update, no_update, no_update, no_update, no_update, no_update
+
+    page_state = (project_restore.get("page_state") or {}).get("data_workshop")
+    if not page_state:
+        return no_update, no_update, no_update, no_update, no_update, no_update
+
+    original_data = page_state.get("original_data")
+    preview_data = page_state.get("preview_data")
+    pipeline = page_state.get("pipeline", [])
+    undo_redo_state = page_state.get("undo_redo_state", {"can_undo": False, "can_redo": False})
+    active_json = preview_data or original_data
+    if not active_json:
+        return original_data, preview_data, pipeline, undo_redo_state, no_update, no_update
+
+    df = pd.read_json(active_json, orient="split")
+    table = create_data_grid(df, preview_mode=bool(preview_data))
+    stats = create_data_stats(df)
+    return original_data, preview_data, pipeline, undo_redo_state, table, stats
