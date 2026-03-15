@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from io import StringIO
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -145,16 +146,41 @@ class DataManager:
     def dataset_names(self) -> list[str]:
         return list(self._datasets.keys())
 
+    def get_dataset_source(self, name: Optional[str] = None) -> str:
+        key = name or self._active
+        if key is None:
+            return ""
+        return self._sources.get(key, "")
+
+    def set_dataset_source(self, name: str, source: str) -> None:
+        if name in self._datasets:
+            self._sources[name] = source or ""
+
+    @staticmethod
+    def source_supports_reference(source: str) -> bool:
+        if not source:
+            return False
+        if source.startswith("sample:") or source.startswith("url:"):
+            return True
+        if not source.startswith("file:"):
+            return False
+        file_path = Path(source[5:])
+        return file_path.is_absolute() or file_path.exists()
+
     def export_datasets(self, storage_mode: str = "embedded") -> list[dict]:
         exported: list[dict] = []
         for name, df in self._datasets.items():
+            source = self._sources.get(name, "")
+            effective_mode = storage_mode
+            if storage_mode == "reference" and not self.source_supports_reference(source):
+                effective_mode = "embedded"
             item = {
                 "name": name,
-                "source": self._sources.get(name, ""),
+                "source": source,
                 "active": name == self._active,
-                "storage_mode": storage_mode,
+                "storage_mode": effective_mode,
             }
-            if storage_mode == "embedded":
+            if effective_mode == "embedded":
                 item["data_json"] = df.to_json(date_format="iso", orient="split")
             exported.append(item)
         return exported

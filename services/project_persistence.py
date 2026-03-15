@@ -8,14 +8,20 @@ import io
 import json
 import zipfile
 from datetime import datetime, timezone
+from io import StringIO
+from pathlib import Path
 from typing import Any
+
+import pandas as pd
 
 import config
 from core.data_manager import DataManager
 from core.state_manager import get_initial_state
+from services.data_loader import load_file, load_sample_dataset
 
 
 SCHEMA_VERSION = 1
+PROJECT_EXTENSION = ".dvs"
 
 
 def _utc_now() -> str:
@@ -101,20 +107,84 @@ def load_project_archive(archive_bytes: bytes) -> dict[str, Any]:
     return snapshot
 
 
+def _load_dataset_from_reference(source: str):
+    if not source:
+        return None
+    if source.startswith("sample:"):
+        return load_sample_dataset(source.split(":", 1)[1])
+    if source.startswith("file:"):
+        file_path = Path(source.split(":", 1)[1])
+        if not file_path.exists():
+            return None
+        return load_file(file_path.read_bytes(), file_path.name)
+    if source.startswith("url:"):
+        import requests
+
+        url = source.split(":", 1)[1]
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        filename = Path(url.split("?", 1)[0]).name or "download.csv"
+        return load_file(response.content, filename)
+    return None
+
+
+def _restore_datasets(datasets: list[dict[str, Any]]) -> tuple[list[str], str | None]:
+    dm = DataManager()
+    dm.clear()
+    warnings: list[str] = []
+    active_name: str | None = None
+
+    for dataset in datasets or []:
+        restored_df = None
+        source = dataset.get("source", "")
+        data_json = dataset.get("data_json")
+
+        if data_json:
+            restored_df = pd.read_json(StringIO(data_json), orient="split")
+        elif dataset.get("storage_mode") == "reference":
+            try:
+                restored_df = _load_dataset_from_reference(source)
+            except Exception as exc:
+                warnings.append(f"{dataset.get('name') or 'dataset'}: {exc}")
+
+        if restored_df is None:
+            if dataset.get("storage_mode") == "reference":
+                warnings.append(f"{dataset.get('name') or 'dataset'}: failed to reload from source")
+            continue
+
+        final_name = dm.add_dataset(
+            dataset.get("name") or "dataset",
+            restored_df,
+            source=source,
+        )
+        if dataset.get("active"):
+            active_name = final_name
+
+    if active_name and active_name in dm.dataset_names:
+        dm.active_name = active_name
+    return warnings, dm.active_name
+
+
 def restore_project_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     dm = DataManager()
-    dm.restore_datasets(snapshot.get("datasets", []))
+    warnings, active_name = _restore_datasets(snapshot.get("datasets", []))
 
     app_state = get_initial_state()
     app_state.update(snapshot.get("app_state", {}))
-    app_state["active_dataset"] = dm.active_name
+    app_state["active_dataset"] = active_name
     app_state["datasets"] = dm.dataset_names
     app_state["project_name"] = snapshot.get("project_meta", {}).get("name")
     app_state["project_storage_mode"] = snapshot.get("storage_mode", "embedded")
+    if warnings:
+        app_state["toast"] = {
+            "message": "Some referenced datasets could not be restored and were skipped.",
+            "type": "warning",
+        }
 
     return {
         "app_state": app_state,
         "page_state": snapshot.get("page_state", {}),
         "route": snapshot.get("route") or "/home",
         "project_meta": snapshot.get("project_meta", {}),
+        "restore_warnings": warnings,
     }

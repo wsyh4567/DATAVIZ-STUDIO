@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import logging
 import base64
+import platform
 
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
@@ -26,7 +27,7 @@ from core.data_manager import DataManager
 from components.navbar import create_navbar
 from components.sidebar import create_sidebar
 from components.statusbar import create_statusbar
-from services.project_persistence import build_project_archive, load_project_archive, restore_project_snapshot
+from services.project_persistence import PROJECT_EXTENSION, build_project_archive, load_project_archive, restore_project_snapshot
 from utils.helpers import format_number
 
 # Import page modules to register their callbacks
@@ -323,12 +324,12 @@ def update_topbar_sysinfo(n):
         is_executing = app_cpu > 2.0
         if is_executing:
             status_color = "#DD6B20"
-            status_text = "Python 执行中"
+            status_text = f"Python 执行中 · Python {platform.python_version()}"
             status_icon = "bi bi-gear-wide-connected"
             pulse_class = "spin-slow" # 假设有一点旋转效果，退而求其次用静态
         else:
             status_color = "#38A169"
-            status_text = "Python 空闲中"
+            status_text = f"Python 空闲中 · Python {platform.python_version()}"
             status_icon = "bi bi-check-circle-fill"
             pulse_class = ""
 
@@ -520,11 +521,11 @@ def save_project(n_clicks, project_name, storage_mode, store_data, page_state, p
 
     next_state = dict(store_data or {})
     next_state["project_name"] = final_name
-    next_state["project_path"] = f"{final_name}.dvsp"
+    next_state["project_path"] = f"{final_name}{PROJECT_EXTENSION}"
     next_state["project_storage_mode"] = storage_mode or "embedded"
     next_state["project_dirty"] = False
-    next_state["toast"] = {"message": f"项目已保存为 {final_name}.dvsp", "type": "success"}
-    return dcc.send_bytes(archive, f"{final_name}.dvsp"), next_state
+    next_state["toast"] = {"message": f"Project exported: {final_name}{PROJECT_EXTENSION}", "type": "success"}
+    return dcc.send_bytes(archive, f"{final_name}{PROJECT_EXTENSION}"), next_state
 
 
 @callback(
@@ -548,11 +549,11 @@ def open_project(contents, filename):
         app_state = dict(restored["app_state"])
         app_state["project_path"] = filename
         app_state["project_dirty"] = False
-        app_state["toast"] = {"message": f"项目已打开: {filename}", "type": "success"}
+        app_state["toast"] = {"message": f"Project opened: {filename}", "type": "success"}
         return restored, restored["page_state"], app_state, restored["route"]
     except Exception as exc:
         failed_state = get_initial_state()
-        failed_state["toast"] = {"message": f"打开项目失败: {exc}", "type": "error"}
+        failed_state["toast"] = {"message": f"Open project failed: {exc}", "type": "error"}
         return no_update, no_update, failed_state, no_update
 
 

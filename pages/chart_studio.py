@@ -21,6 +21,7 @@ from core.data_manager import DataManager
 from components.code_preview import create_code_preview_panel
 from services.chart_service import ChartService, ChartLibrary, ChartType, PLOTLY_CHART_TYPES, SEABORN_CHART_TYPES
 from services.code_generator import CodeGenerator
+from services.export_service import build_chart_export
 from services.field_analyzer import get_labeled_options
 from services.chart_recommender import ChartRecommender
 
@@ -1212,35 +1213,30 @@ def export_chart(png_clicks, svg_clicks, html_clicks, fig_json, library):
 @callback(
     Output('download-code-file', 'data'),
     Input('download-py-btn', 'n_clicks'),
-    State('generated-code-display', 'value'),
+    State('chart-data-store', 'data'),
     prevent_initial_call=True
 )
-def download_code(n_clicks, code):
+def download_code(n_clicks, chart_config):
     """?? Python ??"""
-    if not code or code.startswith('#'):
-        return None
+    if not n_clicks or not chart_config:
+        return no_update
 
-    return dict(
-        content=code,
-        filename='chart_code.py'
-    )
+    bundle = build_chart_export(chart_config)
+    return dict(content=bundle.py_content, filename=bundle.py_filename)
 
 
 @callback(
     Output('download-jupyter-file', 'data'),
     Input('export-jupyter-btn', 'n_clicks'),
-    State('generated-code-display', 'value'),
     State('chart-data-store', 'data'),
     prevent_initial_call=True
 )
-def download_jupyter_notebook(n_clicks, code, chart_config):
-    if not n_clicks or not code or code.startswith('#'):
+def download_jupyter_notebook(n_clicks, chart_config):
+    if not n_clicks or not chart_config:
         return no_update
 
-    return dict(
-        content=_build_notebook_content(code, chart_config),
-        filename='chart_code.ipynb'
-    )
+    bundle = build_chart_export(chart_config)
+    return dict(content=bundle.ipynb_content, filename=bundle.ipynb_filename)
 
 @callback(
     Output('copy-success-toast', 'is_open'),
