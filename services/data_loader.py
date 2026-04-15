@@ -130,8 +130,9 @@ def _optimize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
         # 尝试转换为日期时间类型
         elif pd.api.types.is_string_dtype(df[col]):
             try:
-                # 尝试转换为日期时间，errors='coerce' 会将无法解析的转换为 NaT
-                df[col] = pd.to_datetime(df[col], errors='coerce')
+                # `format="mixed"` avoids pandas' per-value fallback warning while
+                # still allowing heterogeneous datetime strings in real datasets.
+                df[col] = pd.to_datetime(df[col], errors='coerce', format='mixed')
                 # 如果转换后大部分是 NaT，则可能不是日期时间，恢复为字符串
                 if df[col].isnull().sum() > len(df) * 0.5:
                     df[col] = df[col].astype(str)

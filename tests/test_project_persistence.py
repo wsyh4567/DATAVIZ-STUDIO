@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import tempfile
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -84,3 +85,32 @@ def test_project_archive_round_trip_reference_file_restore():
         assert restored["app_state"]["active_dataset"] == "sales"
         assert DataManager().get_dataset("sales") is not None
         assert list(DataManager().get_dataset("sales").columns) == ["amount", "region"]
+
+
+def test_reference_file_restore_does_not_emit_datetime_inference_warning():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        csv_path = Path(tmp_dir) / "sales.csv"
+        csv_path.write_text("amount,region\n10,east\n20,west\n", encoding="utf-8")
+
+        dm = DataManager()
+        dm.clear()
+        dm.add_dataset("sales", pd.read_csv(csv_path), source=f"file:{csv_path}")
+
+        archive = build_project_archive(
+            project_name="warning-check",
+            app_state={},
+            page_state={},
+            pathname="/workshop",
+            storage_mode="reference",
+        )
+
+        snapshot = load_project_archive(archive)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            restore_project_snapshot(snapshot)
+
+        assert not [
+            warning
+            for warning in caught
+            if "Could not infer format" in str(warning.message)
+        ]
