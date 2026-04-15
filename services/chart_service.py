@@ -20,6 +20,15 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # 使用非交互式后端
 
+_CJK_FONT_FALLBACKS = [
+    'Microsoft YaHei',
+    'SimHei',
+    'Noto Sans CJK SC',
+    'Arial Unicode MS',
+    'DejaVu Sans',
+    'sans-serif',
+]
+
 
 class ChartLibrary(str, Enum):
     """图表库枚举"""
@@ -304,7 +313,6 @@ class ChartService:
         params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """使用 Seaborn 创建图表"""
-
         chart_type_str = getattr(chart_type, 'value', str(chart_type))
 
         # 分离样式参数
@@ -334,6 +342,8 @@ class ChartService:
             plt.rcParams['axes.labelcolor'] = '#4A5568'
             plt.rcParams['xtick.color'] = '#718096'
             plt.rcParams['ytick.color'] = '#718096'
+
+        self._configure_matplotlib_fonts()
 
         # 设置调色板：优先取样式面板的 color_scale，若无则取专用面板的 palette
         palette = style_params.get('color_scale') or chart_params.pop('palette', 'deep')
@@ -486,6 +496,13 @@ class ChartService:
             'chart': f'data:image/png;base64,{img_base64}',
             'library': 'seaborn'
         }
+
+    @staticmethod
+    def _configure_matplotlib_fonts():
+        """Prefer CJK-capable fonts so Chinese labels render in static charts."""
+        plt.rcParams['font.family'] = 'sans-serif'
+        plt.rcParams['font.sans-serif'] = _CJK_FONT_FALLBACKS
+        plt.rcParams['axes.unicode_minus'] = False
 
 
 # Plotly 图表类型映射

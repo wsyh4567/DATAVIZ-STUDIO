@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import json
+import warnings
 
 import pandas as pd
 
@@ -70,21 +71,24 @@ def test_seaborn_chart_returns_png_data_url():
     service = ChartService()
     service.set_library(ChartLibrary.SEABORN)
 
-    result = service.create_chart(
-        _chart_df(),
-        ChartType.scatter,
-        {
-            "x": "x",
-            "y": "y",
-            "hue": "category",
-            "title": "静态散点图",
-        },
-    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = service.create_chart(
+            _chart_df(),
+            ChartType.scatter,
+            {
+                "x": "x",
+                "y": "y",
+                "hue": "category",
+                "title": "静态散点图",
+            },
+        )
     image_bytes = base64.b64decode(result["chart"].split(",", 1)[1])
 
     assert result["library"] == "seaborn"
     assert result["chart"].startswith("data:image/png;base64,")
     assert image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+    assert not any("Glyph" in str(item.message) for item in caught)
 
 
 def test_plotly_code_generation_keeps_style_settings_out_of_px_call():
