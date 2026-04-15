@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import List, Optional
 
 import pandas as pd
@@ -192,12 +192,12 @@ class ChartRecommender:
 
         # 查找匹配的规则
         key = (x_type, y_type)
-        recommendations = list(cls._RULES.get(key, []))
+        recommendations = [replace(rec) for rec in cls._RULES.get(key, [])]
 
         # 如果没有精确匹配，尝试反向
         if not recommendations:
             key_reversed = (y_type, x_type)
-            recommendations = list(cls._RULES.get(key_reversed, []))
+            recommendations = [replace(rec) for rec in cls._RULES.get(key_reversed, [])]
 
         # 如果有 color 字段，微调评分
         if color and recommendations:

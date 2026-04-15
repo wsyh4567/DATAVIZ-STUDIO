@@ -903,6 +903,59 @@ def toggle_advanced_params(n_clicks, is_open):
     return not is_open
 
 
+def _recommendation_card(rec):
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.I(className=f"{rec.icon} me-2", style={"fontSize": "1.1rem", "color": "var(--text-muted)", "marginBottom": "2px"}),
+                            html.Span(rec.name, className="ms-1", style={"fontWeight": "600", "fontSize": "0.85rem", "pointerEvents": "none"}),
+                        ],
+                        className="d-flex align-items-center",
+                        style={"pointerEvents": "none"},
+                    ),
+                    html.Span(
+                        f"{rec.score}分",
+                        style={
+                            "fontSize": "0.7rem",
+                            "color": "var(--success)",
+                            "padding": "2px 8px",
+                            "borderRadius": "999px",
+                            "backgroundColor": "rgba(16, 185, 129, 0.12)",
+                            "pointerEvents": "none",
+                        },
+                    ),
+                ],
+                className="d-flex align-items-center justify-content-between mb-1",
+            ),
+            html.Div(rec.reason, style={"fontSize": "0.78rem", "color": "var(--text-secondary)", "lineHeight": "1.5", "pointerEvents": "none"}),
+            html.Div(
+                [
+                    html.Span("适用场景", className="me-2", style={"fontSize": "0.72rem", "color": "var(--text-muted)", "pointerEvents": "none"}),
+                    html.Span(
+                        rec.scene,
+                        style={
+                            "fontSize": "0.72rem",
+                            "color": "var(--accent)",
+                            "backgroundColor": "rgba(99, 102, 241, 0.12)",
+                            "padding": "2px 8px",
+                            "borderRadius": "999px",
+                            "pointerEvents": "none",
+                        },
+                    ),
+                ],
+                className="mt-2 d-flex align-items-center flex-wrap",
+            ),
+        ],
+        className='p-2 mb-2 filter-condition-card filter-group-card',
+        id={'type': 'rec-card', 'index': rec.chart_type},
+        n_clicks=0,
+        style={"cursor": "pointer"}
+    )
+
+
 @callback(
     [Output('param-y', 'options'),
      Output('param-color', 'options'),
@@ -931,26 +984,12 @@ def validate_params(x_val, y_val, color_val):
     if x_val or y_val:
         recs = ChartRecommender.recommend(df, x=x_val, y=y_val, color=color_val)
         if recs:
-            rec_cards = []
-            for rec in recs:
-                rec_cards.append(
-                    html.Div([
-                        html.Div([
-                            html.I(className=f"{rec.icon} me-2", style={"fontSize": "1.2rem", "color": "var(--text-muted)", "marginBottom": "2px"}),
-                            html.Span(rec.name, className="ms-1",
-                                      style={"fontWeight": "600", "fontSize": "0.85rem", "pointerEvents": "none"}),
-                            html.Span(f" {rec.score}分",
-                                      style={"fontSize": "0.7rem", "color": "var(--success)",
-                                             "marginLeft": "auto", "pointerEvents": "none"}),
-                        ], className="d-flex align-items-center", style={"pointerEvents": "none"}),
-                    ],
-                        className='p-2 mb-1 filter-condition-card filter-group-card',
-                        id={'type': 'rec-card', 'index': rec.chart_type},
-                        n_clicks=0,
-                        style={"cursor": "pointer"}
-                    )
-                )
-            recommend_content = html.Div(rec_cards)
+            recommend_content = html.Div(
+                [
+                    html.Div("点击卡片可直接切换图表类型", style={"fontSize": "0.72rem", "color": "var(--text-muted)", "marginBottom": "8px"}),
+                    *[_recommendation_card(rec) for rec in recs],
+                ]
+            )
         else:
             recommend_content = "暂无推荐，请尝试选择不同的字段"
     else:

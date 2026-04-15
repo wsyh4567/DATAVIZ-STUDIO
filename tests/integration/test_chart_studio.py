@@ -6,9 +6,16 @@ from __future__ import annotations
 import json
 
 import pandas as pd
+import pytest
 
+from core.data_manager import DataManager
+from dash.development.base_component import Component
+from pages.chart_studio import validate_params
 from services.chart_recommender import ChartRecommender
 from services.chart_service import ChartLibrary, ChartService, ChartType
+
+pytest.importorskip("dash")
+pytest.importorskip("dash_bootstrap_components")
 
 
 def _sales_df() -> pd.DataFrame:
@@ -18,8 +25,25 @@ def _sales_df() -> pd.DataFrame:
             "sales": [120, 180, 160, 140],
             "profit": [18, 30, 22, 20],
             "date": pd.date_range("2024-01-01", periods=4, freq="D"),
+            "channel": ["直营网点", "电商", "经销商", "电商"],
         }
     )
+
+
+def _collect_text(node, chunks=None):
+    if chunks is None:
+        chunks = []
+    if isinstance(node, str):
+        chunks.append(node)
+        return chunks
+    if isinstance(node, Component):
+        children = getattr(node, "children", None)
+        if isinstance(children, (list, tuple)):
+            for child in children:
+                _collect_text(child, chunks)
+        elif children is not None:
+            _collect_text(children, chunks)
+    return chunks
 
 
 def test_recommender_prefers_bar_for_dimension_measure_pair():
@@ -36,6 +60,30 @@ def test_recommender_prefers_line_for_temporal_measure_pair():
     assert recommendations
     assert recommendations[0].chart_type == "line"
     assert recommendations[0].score >= 90
+
+
+def test_recommender_scores_do_not_leak_between_calls():
+    baseline = ChartRecommender.recommend(_sales_df(), x="city", y="sales")
+    boosted = ChartRecommender.recommend(_sales_df(), x="city", y="sales", color="channel")
+    repeated = ChartRecommender.recommend(_sales_df(), x="city", y="sales")
+
+    assert baseline[0].score == 95
+    assert boosted[0].score == 100
+    assert [rec.score for rec in repeated] == [rec.score for rec in baseline]
+
+
+def test_validate_params_surfaces_recommendation_reason_and_scene():
+    dm = DataManager()
+    dm.clear()
+    dm.add_dataset("sales", _sales_df())
+
+    _, _, _, content = validate_params("city", "sales", None)
+    text = " ".join(_collect_text(content))
+
+    assert "点击卡片可直接切换图表类型" in text
+    assert "对比不同类别的数值大小，直观清晰" in text
+    assert "适用场景" in text
+    assert "类别对比、排名分析" in text
 
 
 def test_plotly_horizontal_bar_chart_sets_horizontal_orientation():
