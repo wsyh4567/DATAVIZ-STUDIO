@@ -184,8 +184,8 @@ class ChartRecommender:
             return []
 
         # 推断字段类型
-        x_type = cls._get_role(df[x]) if x and x in df.columns else None
-        y_type = cls._get_role(df[y]) if y and y in df.columns else None
+        x_type = cls._get_role(df[x], axis="x") if x and x in df.columns else None
+        y_type = cls._get_role(df[y], axis="y") if y and y in df.columns else None
 
         if x_type is None and y_type is None:
             return []
@@ -231,8 +231,12 @@ class ChartRecommender:
         return recommendations[:3]
 
     @staticmethod
-    def _get_role(series: pd.Series) -> Optional[str]:
+    def _get_role(series: pd.Series, axis: Optional[str] = None) -> Optional[str]:
         """将 FieldType 映射为简化角色"""
+        if axis == "y" and pd.api.types.is_numeric_dtype(series.dtype):
+            # Y 轴数值字段在图表推荐场景中通常代表度量值，即使基数字段较小。
+            return "measure"
+
         ft = infer_field_type(series)
         mapping = {
             FieldType.MEASURE: "measure",
