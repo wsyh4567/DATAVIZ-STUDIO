@@ -197,8 +197,6 @@ def layout():
         dcc.Store(id='dm-loaded', data=has_active),
         dcc.Store(id='left-drawer-open', data=True),
 
-        dcc.Store(id='left-drawer-open', data=True),
-
         # 抽屉式的算子工具箱
         dbc.Offcanvas(
             create_operation_toolbar(),
