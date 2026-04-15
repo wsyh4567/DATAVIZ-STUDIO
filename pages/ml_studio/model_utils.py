@@ -281,6 +281,46 @@ def get_search_space(task: str, algo: str) -> dict[str, list[Any]]:
     return spaces.get((task, algo), {})
 
 
+def _classification_label_counts(y: pd.Series) -> pd.Series:
+    return pd.Series(y).astype(str).value_counts(dropna=False)
+
+
+def _resolve_holdout_stratify(y: pd.Series, task: str) -> tuple[pd.Series | None, str | None]:
+    if task != "classification":
+        return None, None
+    label_counts = _classification_label_counts(y)
+    if label_counts.size <= 1:
+        return None, "分类目标仅包含 1 个类别，已关闭分层切分。"
+    min_count = int(label_counts.min())
+    if min_count < 2:
+        rare_labels = label_counts[label_counts < 2].index.tolist()[:5]
+        return None, (
+            f"检测到极少类样本（最小类别样本数={min_count}，示例类别={rare_labels}），"
+            "已关闭分层切分以继续训练。"
+        )
+    return y, None
+
+
+def _resolve_cv_strategy(task: str, cv_strategy: str, folds: int, y: pd.Series) -> tuple[Any, str | None]:
+    folds = max(2, int(folds or 5))
+    if cv_strategy == "stratified_kfold" and task == "classification":
+        label_counts = _classification_label_counts(y)
+        min_count = int(label_counts.min()) if not label_counts.empty else 0
+        if min_count < 2:
+            return (
+                KFold(n_splits=folds, shuffle=True, random_state=42),
+                "分类标签存在仅 1 条样本的类别，已将 StratifiedKFold 自动降级为 KFold。",
+            )
+        if folds > min_count:
+            adjusted_folds = max(2, min_count)
+            return (
+                StratifiedKFold(n_splits=adjusted_folds, shuffle=True, random_state=42),
+                f"StratifiedKFold 的折数从 {folds} 自动调整为 {adjusted_folds}，以匹配最小类别样本数。",
+            )
+        return StratifiedKFold(n_splits=folds, shuffle=True, random_state=42), None
+    return KFold(n_splits=folds, shuffle=True, random_state=42), None
+
+
 def get_cv_strategy(task: str, cv_strategy: str, folds: int):
     _require_sklearn()
     folds = max(2, int(folds or 5))
@@ -293,7 +333,7 @@ def run_single_training(df: pd.DataFrame, features: list[str], target: str, task
     prepared = prepare_supervised_dataset(df, features, target, impute_strategy)
     X = prepared.feature_frame
     y = _prepare_target(prepared.target, task)
-    stratify = y if task == "classification" and y.nunique() > 1 else None
+    stratify, split_warning = _resolve_holdout_stratify(y, task)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=float(test_size), random_state=42, stratify=stratify)
     pipeline = build_training_pipeline(task, algo, params, prepared.numeric_features, prepared.categorical_features, impute_strategy, scaler_type)
     started_at = time.perf_counter()
@@ -311,6 +351,8 @@ def run_single_training(df: pd.DataFrame, features: list[str], target: str, task
     run["y_test"] = y_test.tolist()
     run["y_pred"] = np.asarray(y_pred).tolist()
     run["classes"] = sorted(pd.Series(y).astype(str).unique().tolist()) if task == "classification" else []
+    if split_warning:
+        run["warnings"] = [split_warning]
     return run, pipeline
 
 
@@ -321,7 +363,7 @@ def run_cross_validation(df: pd.DataFrame, features: list[str], target: str, tas
     y = _prepare_target(prepared.target, task)
     pipeline = build_training_pipeline(task, algo, params, prepared.numeric_features, prepared.categorical_features, impute_strategy, scaler_type)
     scoring = metric_to_sklearn_scoring(task, primary_metric)
-    cv_obj = get_cv_strategy(task, cv_strategy, folds)
+    cv_obj, cv_warning = _resolve_cv_strategy(task, cv_strategy, folds, y)
     started_at = time.perf_counter()
     cv_result = cross_validate(pipeline, X, y, cv=cv_obj, scoring=scoring, n_jobs=1, return_train_score=False)
     fit_time = time.perf_counter() - started_at
@@ -337,6 +379,8 @@ def run_cross_validation(df: pd.DataFrame, features: list[str], target: str, tas
     run["holdout_metrics"] = {}
     run["report"] = {"cv_scores": scores}
     run["importances"] = importances
+    if cv_warning:
+        run["warnings"] = [cv_warning]
     return run, pipeline
 
 
@@ -354,7 +398,7 @@ def run_model_search(df: pd.DataFrame, features: list[str], target: str, task: s
     if not search_space:
         return run_cross_validation(df, features, target, task, algo, params, impute_strategy, scaler_type, cv_strategy, folds, primary_metric)
     scoring = metric_to_sklearn_scoring(task, primary_metric)
-    cv_obj = get_cv_strategy(task, cv_strategy, folds)
+    cv_obj, cv_warning = _resolve_cv_strategy(task, cv_strategy, folds, y)
     started_at = time.perf_counter()
     search = RandomizedSearchCV(estimator=pipeline, param_distributions=search_space, n_iter=max(1, int(search_iterations or 10)), scoring=scoring, cv=cv_obj, random_state=42, n_jobs=1, refit=True)
     search.fit(X, y)
@@ -380,6 +424,8 @@ def run_model_search(df: pd.DataFrame, features: list[str], target: str, task: s
     run["report"] = {"top_candidates": top_runs}
     run["search_summary"] = top_runs
     run["importances"] = importances
+    if cv_warning:
+        run["warnings"] = [cv_warning]
     return run, best_pipeline
 
 
