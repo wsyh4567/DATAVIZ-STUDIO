@@ -27,6 +27,8 @@ The latest formal release entry is recorded in [CHANGELOG.md](/Users/Toxic/Deskt
 - Project open/save actions are available in the top bar through `.dvs` project files.
 - Reopening a project restores route, datasets, page state, and part of the analysis context.
 - Chart Studio, Data Workshop, and Advanced Tools now share a unified `.py` and `.ipynb` export workflow.
+- ML Studio now surfaces Chinese workflow guidance, algorithm fit notes, and clearer next-step prompts directly in the main page flow.
+- Chart Studio recommendation cards now expose rationale and use cases, and common `city -> sales` / `date -> sales` recommendations are more stable.
 - The top bar now includes system status, Python version, dataset badges, and quick actions.
 - Runtime dependencies were completed, including `requests`, `scipy`, `scikit-learn`, `sqlalchemy`, and `kaleido`.
 
@@ -65,7 +67,7 @@ The latest formal release entry is recorded in [CHANGELOG.md](/Users/Toxic/Deskt
 ### Chart Studio
 
 - Supports both Plotly and Seaborn.
-- Includes chart configuration, live preview, and PNG / SVG / HTML export.
+- Includes chart configuration, live preview, and PNG / HTML export. SVG export is currently limited to supported Plotly flows, while Seaborn charts explicitly fall back to PNG.
 - Generates reproducible Python code and notebook exports.
 
 ### Statistics Lab
@@ -179,6 +181,7 @@ tests/                    Tests
 
 - It is still a single-machine local analytics app, not a multi-user collaboration platform.
 - Large-scale workloads are still constrained by the pandas in-memory model.
+- Plotly static export depends on `kaleido`; without it, HTML export still works but PNG / SVG export will surface a dependency warning.
 - Test coverage can be expanded further across several modules.
 - Documentation currently focuses on onboarding, not full page-by-page reference coverage.
 
