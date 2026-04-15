@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import json
+import warnings
 from unittest.mock import patch
 
 import pandas as pd
@@ -143,9 +144,19 @@ def test_build_chart_download_payload_warns_when_plotly_image_export_needs_kalei
         }
     )
 
-    with patch("plotly.io.to_image", side_effect=ValueError("Image export using the 'kaleido' engine requires the Kaleido package")):
-        payload, feedback = build_chart_download_payload("export-png-btn", plotly_json, "plotly")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with patch(
+            "pages.chart_studio._plotly_to_image",
+            side_effect=ValueError("Image export using the 'kaleido' engine requires the Kaleido package"),
+        ):
+            payload, feedback = build_chart_download_payload("export-png-btn", plotly_json, "plotly")
 
     assert payload is None
     assert feedback[1] == "缺少导出依赖"
     assert "Kaleido" in feedback[2]
+    assert not [
+        warning
+        for warning in caught
+        if "plotly.io.kaleido.scope" in str(warning.message)
+    ]

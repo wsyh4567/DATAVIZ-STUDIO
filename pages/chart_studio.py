@@ -14,6 +14,7 @@ import json
 import io
 import base64
 import uuid
+import warnings
 from datetime import datetime
 import requests
 import plotly.graph_objects as go
@@ -141,13 +142,11 @@ def _build_seaborn_download_payload(triggered: str, fig_data: str):
 
 
 def _build_plotly_download_payload(triggered: str, fig_data):
-    import plotly.io as pio
-
     figure = json.loads(fig_data) if isinstance(fig_data, str) else fig_data
     fig = go.Figure(figure)
 
     if triggered == "export-html-btn":
-        html_str = pio.to_html(fig, full_html=True, include_plotlyjs="cdn")
+        html_str = _plotly_to_html(fig)
         return {"content": html_str, "filename": "chart.html"}, None
 
     image_format = "png" if triggered == "export-png-btn" else "svg"
@@ -159,7 +158,7 @@ def _build_plotly_download_payload(triggered: str, fig_data):
     if image_format == "png":
         image_kwargs["scale"] = 2
     try:
-        img_bytes = pio.to_image(fig, **image_kwargs)
+        img_bytes = _plotly_to_image(fig, **image_kwargs)
     except Exception as exc:
         if "kaleido" in str(exc).lower():
             return None, _build_export_feedback(
@@ -177,6 +176,31 @@ def _build_plotly_download_payload(triggered: str, fig_data):
         }, None
 
     return {"content": img_bytes.decode("utf-8"), "filename": "chart.svg"}, None
+
+
+def _get_plotly_io():
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*plotly\\.io\\.kaleido\\.scope.*",
+            category=DeprecationWarning,
+        )
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*plotly\\.io\\.defaults\\..*",
+            category=DeprecationWarning,
+        )
+        import plotly.io as pio
+
+    return pio
+
+
+def _plotly_to_html(fig, **kwargs):
+    return _get_plotly_io().to_html(fig, **kwargs)
+
+
+def _plotly_to_image(fig, **kwargs):
+    return _get_plotly_io().to_image(fig, **kwargs)
 
 
 def build_chart_download_payload(triggered: str, fig_data, library: str):
