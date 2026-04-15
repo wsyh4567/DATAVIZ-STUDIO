@@ -3,14 +3,16 @@
 
 from __future__ import annotations
 
+import base64
 import json
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
 from core.data_manager import DataManager
 from dash.development.base_component import Component
-from pages.chart_studio import validate_params
+from pages.chart_studio import build_chart_download_payload, validate_params
 from services.chart_recommender import ChartRecommender
 from services.chart_service import ChartLibrary, ChartService, ChartType
 
@@ -105,3 +107,45 @@ def test_plotly_horizontal_bar_chart_sets_horizontal_orientation():
     assert payload["data"][0]["type"] == "bar"
     assert payload["data"][0]["orientation"] == "h"
     assert payload["layout"]["title"]["text"] == "城市销售额"
+
+
+def test_build_chart_download_payload_supports_seaborn_png_export():
+    payload, feedback = build_chart_download_payload(
+        "export-png-btn",
+        "data:image/png;base64," + base64.b64encode(b"fake-png").decode(),
+        "seaborn",
+    )
+
+    assert feedback is None
+    assert payload["filename"] == "chart.png"
+    assert payload["base64"] is True
+    assert base64.b64decode(payload["content"]) == b"fake-png"
+
+
+def test_build_chart_download_payload_warns_when_seaborn_svg_requested():
+    payload, feedback = build_chart_download_payload(
+        "export-svg-btn",
+        "data:image/png;base64," + base64.b64encode(b"fake-png").decode(),
+        "seaborn",
+    )
+
+    assert payload is None
+    assert feedback[0] is True
+    assert feedback[1] == "导出受限"
+    assert "暂不支持 SVG 导出" in feedback[2]
+
+
+def test_build_chart_download_payload_warns_when_plotly_image_export_needs_kaleido():
+    plotly_json = json.dumps(
+        {
+            "data": [{"type": "scatter", "x": [1, 2], "y": [3, 4]}],
+            "layout": {"title": {"text": "Test"}},
+        }
+    )
+
+    with patch("plotly.io.to_image", side_effect=ValueError("Image export using the 'kaleido' engine requires the Kaleido package")):
+        payload, feedback = build_chart_download_payload("export-png-btn", plotly_json, "plotly")
+
+    assert payload is None
+    assert feedback[1] == "缺少导出依赖"
+    assert "Kaleido" in feedback[2]

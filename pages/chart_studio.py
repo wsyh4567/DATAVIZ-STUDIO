@@ -12,6 +12,7 @@ from dash import html, dcc, callback, Input, Output, State, no_update, ctx, MATC
 import pandas as pd
 import json
 import io
+import base64
 import uuid
 from datetime import datetime
 import requests
@@ -89,6 +90,110 @@ def _build_notebook_content(code: str, chart_config: dict | None) -> str:
         'nbformat_minor': 5,
     }
     return json.dumps(notebook, ensure_ascii=False, indent=2)
+
+
+def _decode_data_url(data_url: str) -> tuple[str, bytes]:
+    if not isinstance(data_url, str) or "," not in data_url:
+        raise ValueError("图表数据不是可导出的 data URL。")
+    header, encoded = data_url.split(",", 1)
+    if ";base64" not in header:
+        raise ValueError("图表数据缺少 base64 编码。")
+    mime_type = header.split(":", 1)[1].split(";", 1)[0]
+    return mime_type, base64.b64decode(encoded)
+
+
+def _build_export_feedback(message: str, header: str = "导出失败", icon: str = "warning") -> tuple[bool, str, str, str]:
+    return True, header, message, icon
+
+
+def _build_seaborn_download_payload(triggered: str, fig_data: str):
+    if triggered == "export-png-btn":
+        _, image_bytes = _decode_data_url(fig_data)
+        return {
+            "content": base64.b64encode(image_bytes).decode(),
+            "filename": "chart.png",
+            "base64": True,
+        }, None
+
+    if triggered == "export-html-btn":
+        html_str = "\n".join(
+            [
+                "<!DOCTYPE html>",
+                "<html lang=\"zh-CN\">",
+                "<head>",
+                "  <meta charset=\"utf-8\">",
+                "  <title>Chart Studio Export</title>",
+                "  <style>body{margin:0;padding:24px;font-family:system-ui,sans-serif;background:#f8fafc;}img{max-width:100%;height:auto;display:block;margin:0 auto;box-shadow:0 12px 40px rgba(15,23,42,.12);background:#fff;}</style>",
+                "</head>",
+                "<body>",
+                "  <img src=\"" + fig_data + "\" alt=\"Chart Studio export\" />",
+                "</body>",
+                "</html>",
+            ]
+        )
+        return {"content": html_str, "filename": "chart.html"}, None
+
+    return None, _build_export_feedback(
+        "当前 Seaborn 图表以 PNG 位图保存，暂不支持 SVG 导出。可改用 PNG 导出，或切换到 Plotly 后重新生成。",
+        header="导出受限",
+        icon="warning",
+    )
+
+
+def _build_plotly_download_payload(triggered: str, fig_data):
+    import plotly.io as pio
+
+    figure = json.loads(fig_data) if isinstance(fig_data, str) else fig_data
+    fig = go.Figure(figure)
+
+    if triggered == "export-html-btn":
+        html_str = pio.to_html(fig, full_html=True, include_plotlyjs="cdn")
+        return {"content": html_str, "filename": "chart.html"}, None
+
+    image_format = "png" if triggered == "export-png-btn" else "svg"
+    image_kwargs = {
+        "format": image_format,
+        "width": 1200,
+        "height": 700,
+    }
+    if image_format == "png":
+        image_kwargs["scale"] = 2
+    try:
+        img_bytes = pio.to_image(fig, **image_kwargs)
+    except Exception as exc:
+        if "kaleido" in str(exc).lower():
+            return None, _build_export_feedback(
+                "当前环境缺少 Kaleido，暂时无法导出 PNG/SVG。可先使用 HTML 导出，或安装 `kaleido` 后重试。",
+                header="缺少导出依赖",
+                icon="warning",
+            )
+        raise
+
+    if image_format == "png":
+        return {
+            "content": base64.b64encode(img_bytes).decode(),
+            "filename": "chart.png",
+            "base64": True,
+        }, None
+
+    return {"content": img_bytes.decode("utf-8"), "filename": "chart.svg"}, None
+
+
+def build_chart_download_payload(triggered: str, fig_data, library: str):
+    if not fig_data:
+        return None, _build_export_feedback("请先生成图表后再执行导出。", header="无法导出", icon="warning")
+
+    if triggered not in {"export-png-btn", "export-svg-btn", "export-html-btn"}:
+        return None, None
+
+    try:
+        if library == "plotly":
+            return _build_plotly_download_payload(triggered, fig_data)
+        if library == "seaborn":
+            return _build_seaborn_download_payload(triggered, fig_data)
+        return None, _build_export_feedback("暂不支持当前图表引擎的导出。", header="导出失败", icon="danger")
+    except Exception as exc:
+        return None, _build_export_feedback(f"导出失败：{exc}", header="导出失败", icon="danger")
 
 
 def _render_chart_from_state(fig_data, chart_config):
@@ -357,7 +462,15 @@ def create_chart_studio_page() -> html.Div:
                 dismissable=True,
                 icon="success",
                 duration=3000,
-            )
+            ),
+            dbc.Toast(
+                id="export-feedback-toast",
+                header="导出提示",
+                is_open=False,
+                dismissable=True,
+                icon="warning",
+                duration=4000,
+            ),
         ], style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999, "display": "flex", "flexDirection": "column", "gap": "10px"}),
 
     ], id='chart-studio-page')
@@ -1200,6 +1313,10 @@ def generate_chart(
 
 @callback(
     Output('download-chart-file', 'data'),
+    Output('export-feedback-toast', 'is_open'),
+    Output('export-feedback-toast', 'header'),
+    Output('export-feedback-toast', 'children'),
+    Output('export-feedback-toast', 'icon'),
     Input('export-png-btn', 'n_clicks'),
     Input('export-svg-btn', 'n_clicks'),
     Input('export-html-btn', 'n_clicks'),
@@ -1209,44 +1326,12 @@ def generate_chart(
 )
 def export_chart(png_clicks, svg_clicks, html_clicks, fig_json, library):
     """导出图表为 PNG/SVG/HTML"""
-    from dash import ctx
-    if not fig_json or library != 'plotly':
-        return no_update
-
     triggered = ctx.triggered_id
-
-    try:
-        import plotly.io as pio
-        fig = go.Figure(json.loads(fig_json))
-
-        if triggered == 'export-png-btn':
-            img_bytes = pio.to_image(fig, format='png', width=1200, height=700, scale=2)
-            import base64
-            b64 = base64.b64encode(img_bytes).decode()
-            return dict(
-                content=b64,
-                filename='chart.png',
-                base64=True
-            )
-        elif triggered == 'export-svg-btn':
-            img_bytes = pio.to_image(fig, format='svg', width=1200, height=700)
-            return dict(
-                content=img_bytes.decode('utf-8'),
-                filename='chart.svg'
-            )
-        elif triggered == 'export-html-btn':
-            html_str = pio.to_html(fig, full_html=True, include_plotlyjs='cdn')
-            return dict(
-                content=html_str,
-                filename='chart.html'
-            )
-    except ImportError:
-        # kaleido not installed for image export
-        return no_update
-    except Exception:
-        return no_update
-
-    return no_update
+    payload, feedback = build_chart_download_payload(triggered, fig_json, library)
+    if feedback:
+        is_open, header, message, icon = feedback
+        return no_update, is_open, header, message, icon
+    return payload, False, no_update, no_update, no_update
 
 
 @callback(
