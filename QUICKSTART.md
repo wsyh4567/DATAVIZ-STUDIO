@@ -11,10 +11,10 @@ pip install -r requirements.txt
 ### 2. 启动应用（30秒）
 
 ```bash
-python cli.py
+python app.py
 ```
 
-应用将自动在浏览器中打开 `http://localhost:8050`
+默认地址：`http://localhost:8050`
 
 ### 3. 加载数据（1分钟）
 
@@ -55,6 +55,7 @@ python cli.py
 #### 步骤 4：导出图表（可选）
 - 点击"PNG"导出静态图片
 - 点击"HTML"导出交互式网页
+- Plotly 图表可在安装 `kaleido` 后导出 SVG；Seaborn 静态图当前会提示改用 PNG
 
 ## 🎯 常见使用场景
 
@@ -130,14 +131,18 @@ python cli.py
 - 分类/日期字段自动识别为"维度"（可分组）
 - 系统会自动推荐最适合的图表类型
 
-### 技巧 4：图表交互
+### 技巧 4：机器学习流程引导
+- 先选择目标列和特征列，页面会自动判断是分类还是回归任务
+- 主界面会直接展示算法中文说明、适用场景和下一步操作提示
+- 建议先跑基线模型，再根据结果切换算法和调参方式
+### 技巧 5：图表交互
 所有图表都支持 Plotly 原生交互：
 - 缩放：框选区域
 - 平移：拖拽图表
 - 悬停：查看数据点详情
 - 重置：双击图表
 
-### 技巧 5：数据预览
+### 技巧 6：数据预览
 在数据画布页面，可以：
 - 点击列头排序
 - 使用列筛选器过滤数据
@@ -170,22 +175,24 @@ pip install -r requirements.txt --force-reinstall
 - 清除浏览器缓存
 - 刷新页面
 
+### 问题 5：PNG / SVG 导出失败
+- Plotly 静态图导出依赖 `kaleido`
+- 若当前使用 Seaborn，引擎会提示 SVG 暂不可用，可直接改导出 PNG
+- 若只需要分享交互图表，可继续使用 HTML 导出
+
 ## 📚 进阶功能
 
-### 即将推出（Phase 3）
-- 数据清洗：缺失值处理、类型转换、筛选排序
-- 统计分析：描述性统计、相关性分析、假设检验
-- 操作流水线：记录所有操作，导出为 Python 代码
+### 数据工坊
+- 可视化执行筛选、排序、缺失值处理、去重、重命名和类型转换
+- 支持步骤预览、撤销 / 重做，以及 Python / Notebook 导出
 
-### 即将推出（Phase 4）
-- 仪表盘：组合多个图表，交叉筛选
-- KPI 指标卡：大数字展示关键指标
-- 数据透视表：拖拽式数据汇总
+### 机器学习
+- 支持分类、回归、聚类与轻量时序分析流程
+- 提供中文算法说明、训练结果摘要和预测反馈
 
-### 即将推出（Phase 5）
-- 数据故事：可滚动的数据叙事页面
-- 时间序列分析：趋势分解、预测
-- 项目保存：保存整个分析状态
+### 项目工作流
+- 顶栏支持打开 / 保存 `.dvs` 项目文件
+- 可恢复当前路由、数据集和部分页面状态，便于继续上次分析
 
 ## 🆘 获取帮助
 
@@ -208,4 +215,5 @@ pip install -r requirements.txt --force-reinstall
 
 - Install with `pip install -r requirements.txt` to get the full app stack, including `requests`, `scipy`, `scikit-learn`, `sqlalchemy`, and `kaleido`.
 - `kaleido` is required for Plotly PNG/SVG export. If it is missing, HTML export still works.
+- Seaborn charts currently export as PNG bitmaps; SVG export is intentionally limited to supported Plotly flows.
 - `python app.py` is the primary startup command. `python cli.py` remains available when supported by your local environment.
