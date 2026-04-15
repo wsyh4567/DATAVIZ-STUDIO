@@ -169,6 +169,23 @@ class TestCodeGenerator:
         assert 'pd.to_numeric' in code
         assert "df['age']" in code
         assert "errors='coerce'" in code
+
+    def test_generate_type_conversion_code_for_int(self):
+        """测试整数类型转换代码生成"""
+        params = {'column': 'age', 'target_type': 'int'}
+        code = self.generator._generate_type_conversion_code(params)
+
+        assert 'pd.to_numeric' in code
+        assert ".astype('Int64')" in code
+        assert '整数型' in code
+
+    def test_generate_type_conversion_code_for_bool(self):
+        """测试布尔类型转换代码生成"""
+        params = {'column': 'is_active', 'target_type': 'bool'}
+        code = self.generator._generate_type_conversion_code(params)
+
+        assert ".astype(bool)" in code
+        assert '布尔型' in code
     
     def test_generate_sort_code(self):
         """测试排序代码生成"""
@@ -212,6 +229,13 @@ class TestCodeGenerator:
         assert any('read_csv' in line for line in lines)
         assert any('步骤1' in line for line in lines)
         assert any('步骤2' in line for line in lines)
+
+    def test_generate_unknown_operation_code_fails_fast(self):
+        """测试未知操作导出会明确失败"""
+        code = self.generator.generate_step_code({'operation': 'unsupported_operation', 'params': {}})
+
+        assert '暂不支持操作' in code
+        assert 'NotImplementedError' in code
 
 
 if __name__ == '__main__':

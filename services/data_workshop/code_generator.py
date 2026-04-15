@@ -120,7 +120,10 @@ print(f"数据形状: {{df.shape}}")"""
         elif operation == 'create_calculated':
             return self._generate_calculated_code(params)
         else:
-            return f"# TODO: Generate code for {operation}"
+            return (
+                f"# 当前导出暂不支持操作: {operation}\n"
+                f"raise NotImplementedError('Data Workshop export does not support operation: {operation}')"
+            )
     
     def _generate_filter_code(self, params: Dict) -> str:
         """生成筛选代码"""
@@ -173,12 +176,16 @@ print(f"数据形状: {{df.shape}}")"""
         column = params.get('column', '')
         target_type = params.get('target_type', 'numeric')
         
-        if target_type == 'numeric':
+        if target_type in ['int', 'int64', 'integer']:
+            return f"df['{column}'] = pd.to_numeric(df['{column}'], errors='coerce').astype('Int64')\nprint(f'列 {column} 已转换为整数型')"
+        elif target_type in ['float', 'float64', 'numeric', 'number']:
             return f"df['{column}'] = pd.to_numeric(df['{column}'], errors='coerce')\nprint(f'列 {column} 已转换为数值型')"
-        elif target_type == 'datetime':
+        elif target_type in ['datetime', 'date', 'datetime64']:
             return f"df['{column}'] = pd.to_datetime(df['{column}'], errors='coerce')\nprint(f'列 {column} 已转换为日期型')"
-        elif target_type == 'string':
+        elif target_type in ['str', 'string', 'text']:
             return f"df['{column}'] = df['{column}'].astype(str)\nprint(f'列 {column} 已转换为字符串型')"
+        elif target_type in ['bool', 'boolean']:
+            return f"df['{column}'] = df['{column}'].astype(bool)\nprint(f'列 {column} 已转换为布尔型')"
         else:
             return f"# 未知的目标类型: {target_type}"
     

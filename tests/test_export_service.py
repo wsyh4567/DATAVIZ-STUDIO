@@ -51,6 +51,26 @@ def test_workshop_export_uses_pipeline_steps():
     assert bundle.ipynb_filename.endswith(".ipynb")
 
 
+def test_workshop_export_supports_ui_type_conversion_options():
+    dm = DataManager()
+    dm.add_dataset(
+        "flags",
+        pd.DataFrame({"raw_bool": [1, 0], "raw_int": ["1", "2"]}),
+        source="file:/tmp/flags.csv",
+    )
+
+    pipeline = [
+        {"operation": "type_conversion", "params": {"column": "raw_bool", "target_type": "bool"}},
+        {"operation": "type_conversion", "params": {"column": "raw_int", "target_type": "int"}},
+    ]
+
+    bundle = build_workshop_export(pipeline)
+
+    assert "astype(bool)" in bundle.py_content
+    assert ".astype('Int64')" in bundle.py_content
+    assert "未知的目标类型" not in bundle.py_content
+
+
 def test_advanced_export_aggregates_workshop_and_chart():
     dm = DataManager()
     dm.add_dataset("orders", pd.DataFrame({"x": [1, 2], "y": [3, 4]}), source="sample:iris")

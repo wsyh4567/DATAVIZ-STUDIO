@@ -259,6 +259,7 @@ class TestOperationExecutor:
         assert 'full_name' in result_df.columns
         assert result_df['full_name'].iloc[0] == 'John Doe'
         assert result_df['full_name'].iloc[1] == 'Jane Smith'
+        assert "df[['first', 'last']]" in code
     
     def test_execute_replace_value(self):
         """测试值替换"""

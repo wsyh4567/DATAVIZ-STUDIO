@@ -270,7 +270,7 @@ df = df.drop(columns=['{column}'])"""
         result_df = df.copy()
         result_df[new_column] = result_df[columns].astype(str).agg(delimiter.join, axis=1)
 
-        code = f"df['{new_column}'] = df{columns}.astype(str).agg('{delimiter}'.join, axis=1)"
+        code = f"df['{new_column}'] = df[{columns}].astype(str).agg('{delimiter}'.join, axis=1)"
 
         return result_df, code
 
