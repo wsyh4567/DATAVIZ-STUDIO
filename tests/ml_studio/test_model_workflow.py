@@ -4,6 +4,7 @@ import types
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -151,3 +152,10 @@ def test_serialize_and_load_artifact_roundtrip(tmp_path):
     assert loaded_metadata["run_id"] == run["run_id"]
     assert isinstance(report, dict)
     assert len(loaded_model.predict(_regression_df()[["x1", "x2", "group"]].head(2))) == 2
+
+
+def test_build_estimator_raises_clear_error_when_sklearn_is_unavailable(monkeypatch):
+    monkeypatch.setattr(mu, "_SKLEARN_IMPORT_ERROR", ImportError("broken sklearn"))
+
+    with pytest.raises(RuntimeError, match="scikit-learn"):
+        mu.build_estimator("classification", "rf_clf", {})

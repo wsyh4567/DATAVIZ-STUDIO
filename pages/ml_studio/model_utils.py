@@ -24,6 +24,8 @@ from .config import (
     PROJECT_INDEX_FILE,
 )
 
+_SKLEARN_IMPORT_ERROR: ImportError | None = None
+
 try:
     from sklearn.compose import ColumnTransformer
     from sklearn.ensemble import (
@@ -57,8 +59,16 @@ try:
     from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
     from sklearn.svm import SVC, SVR
     from sklearn.tree import DecisionTreeClassifier
-except ImportError:
-    pass
+except ImportError as exc:
+    _SKLEARN_IMPORT_ERROR = exc
+
+
+def _require_sklearn() -> None:
+    if _SKLEARN_IMPORT_ERROR is not None:
+        raise RuntimeError(
+            "ML Studio requires a working scikit-learn installation. "
+            "Reinstall project dependencies to restore model training."
+        ) from _SKLEARN_IMPORT_ERROR
 
 
 _MODEL_CACHE: dict[str, Any] = {
@@ -197,6 +207,7 @@ def prepare_supervised_dataset(df: pd.DataFrame, features: list[str], target: st
 
 
 def build_preprocessing_pipeline(numeric_features: list[str], categorical_features: list[str], impute_strategy: str, scaler_type: str) -> ColumnTransformer:
+    _require_sklearn()
     numeric_steps: list[tuple[str, Any]] = []
     if numeric_features:
         numeric_imputer = impute_strategy if impute_strategy in {"mean", "median", "most_frequent"} else "mean"
@@ -220,6 +231,7 @@ def build_preprocessing_pipeline(numeric_features: list[str], categorical_featur
 
 
 def build_estimator(task: str, algo: str, params: dict[str, Any]) -> Any:
+    _require_sklearn()
     params = params or {}
     if task == "classification":
         if algo == "rf_clf":
@@ -270,6 +282,7 @@ def get_search_space(task: str, algo: str) -> dict[str, list[Any]]:
 
 
 def get_cv_strategy(task: str, cv_strategy: str, folds: int):
+    _require_sklearn()
     folds = max(2, int(folds or 5))
     if cv_strategy == "stratified_kfold" and task == "classification":
         return StratifiedKFold(n_splits=folds, shuffle=True, random_state=42)
@@ -371,6 +384,7 @@ def run_model_search(df: pd.DataFrame, features: list[str], target: str, task: s
 
 
 def evaluate_predictions(task: str, y_true, y_pred) -> tuple[dict[str, Any], dict[str, Any]]:
+    _require_sklearn()
     if task == "classification":
         return calculate_clf_metrics(y_true, y_pred), {"classification_report": classification_report(y_true, y_pred, output_dict=True, zero_division=0), "confusion_matrix": confusion_matrix(y_true, y_pred).tolist()}
     metrics = calculate_reg_metrics(y_true, y_pred)
