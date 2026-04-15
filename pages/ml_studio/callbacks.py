@@ -15,7 +15,18 @@ from dash.exceptions import PreventUpdate
 
 from core.data_manager import DataManager
 from .components import algorithm_guide_card, empty_placeholder, kpi_card, workflow_hint_card
-from .config import ALGORITHM_GUIDANCE, ACCENT_COLORS, CV_STRATEGY_OPTIONS, DEFAULT_PRIMARY_METRIC, HAS_SKLEARN, PRIMARY_METRIC_OPTIONS, TASK_LABELS
+from .config import (
+    ALGORITHM_GUIDANCE,
+    ACCENT_COLORS,
+    CV_STRATEGY_LABELS,
+    CV_STRATEGY_OPTIONS,
+    DEFAULT_PRIMARY_METRIC,
+    HAS_SKLEARN,
+    METRIC_LABELS,
+    PRIMARY_METRIC_OPTIONS,
+    TASK_LABELS,
+    TRAINING_MODE_LABELS,
+)
 from .model_utils import (
     convert_metadata_to_published,
     delete_run_artifact,
@@ -126,6 +137,32 @@ def _published_summary(published_model: dict[str, Any] | None):
     return convert_metadata_to_published(published_model, published_model.get("artifact_path"))
 
 
+def _display_metric(metric: str | None) -> str:
+    return METRIC_LABELS.get(metric or "", metric or "-")
+
+
+def _display_training_mode(mode: str | None) -> str:
+    return TRAINING_MODE_LABELS.get(mode or "", mode or "-")
+
+
+def _display_cv_strategy(strategy: str | None) -> str:
+    return CV_STRATEGY_LABELS.get(strategy or "", strategy or "-")
+
+
+def _display_task(task: str | None) -> str:
+    return TASK_LABELS.get(task or "", task or "-")
+
+
+def _action_status_label(action: str) -> str:
+    return {
+        "view": "已查看实验记录。",
+        "load": "已加载实验记录。",
+        "publish": "模型已发布，可进入预测环节。",
+        "save": "实验记录已保存到本地。",
+        "delete": "实验记录已删除。",
+    }.get(action, "操作已完成。")
+
+
 def _resolve_algorithm_guide(active_tab: str, classifier: str | None, regressor: str | None, cluster_algo: str | None, ts_algo: str | None) -> dict[str, Any]:
     if active_tab == "tab-reg":
         return ALGORITHM_GUIDANCE["regression"].get(regressor or "rf_reg", ALGORITHM_GUIDANCE["regression"]["rf_reg"])
@@ -177,7 +214,7 @@ def _prediction_form(published_model: dict[str, Any]) -> html.Div:
         html.Div(id="ml-single-predict-output", className="mt-3"),
         html.Hr(),
         html.H6("批量预测"),
-        dbc.Input(id="ml-batch-pred-col", placeholder="预测结果列名", value="prediction", className="mb-2"),
+        dbc.Input(id="ml-batch-pred-col", placeholder="预测结果列名", value="预测结果", className="mb-2"),
         dbc.Button("写回当前数据集", id="btn-ml-batch-predict", color="secondary"),
         html.Div(id="ml-batch-predict-output", className="mt-3"),
     ])
@@ -186,26 +223,26 @@ def _prediction_form(published_model: dict[str, Any]) -> html.Div:
 def _render_overview(run: dict[str, Any]):
     task = run.get("task")
     if task == "classification" and run.get("report", {}).get("confusion_matrix"):
-        fig = px.imshow(run["report"]["confusion_matrix"], text_auto=True, color_continuous_scale="Blues", title="Confusion Matrix")
+        fig = px.imshow(run["report"]["confusion_matrix"], text_auto=True, color_continuous_scale="Blues", title="混淆矩阵")
         return dcc.Graph(figure=fig, config={"displayModeBar": False})
     if task == "regression" and run.get("y_test") and run.get("y_pred"):
-        df = pd.DataFrame({"Actual": run["y_test"], "Predicted": run["y_pred"]})
-        fig = px.scatter(df, x="Actual", y="Predicted", trendline="ols", title="Actual vs Predicted")
+        df = pd.DataFrame({"实际值": run["y_test"], "预测值": run["y_pred"]})
+        fig = px.scatter(df, x="实际值", y="预测值", trendline="ols", title="实际值 vs 预测值")
         return dcc.Graph(figure=fig, config={"displayModeBar": False})
     if run.get("search_summary"):
         return dbc.Table.from_dataframe(pd.DataFrame(run["search_summary"]), striped=True, bordered=False, hover=True, size="sm")
     if run.get("cv_scores"):
-        fig = px.line(y=run["cv_scores"], markers=True, title="Cross-validation Scores")
+        fig = px.line(y=run["cv_scores"], markers=True, title="交叉验证分数")
         return dcc.Graph(figure=fig, config={"displayModeBar": False})
-    return empty_placeholder("No visualization available for this run.")
+    return empty_placeholder("当前实验暂时没有可视化结果。")
 
 
 def _render_feature_tab(run: dict[str, Any]):
     importances = run.get("importances") or []
     if not importances:
-        return dbc.Alert("This model does not expose feature importance.", color="secondary")
+        return dbc.Alert("当前模型不提供特征重要性，请优先查看详细报告或更换树模型。", color="secondary")
     frame = pd.DataFrame(importances[:20])
-    fig = px.bar(frame.sort_values("importance"), x="importance", y="feature", orientation="h", title="Top Feature Importance")
+    fig = px.bar(frame.sort_values("importance"), x="importance", y="feature", orientation="h", title="特征重要性 Top 20")
     fig.update_layout(height=500)
     return dcc.Graph(figure=fig, config={"displayModeBar": False})
 
@@ -324,7 +361,7 @@ def load_local_project(_):
             detail["artifact_path"] = selected["artifact_path"]
             update_cached_model_context(model, detail, detail["run_id"], published=True)
             published_model = convert_metadata_to_published(detail, selected["artifact_path"])
-    message = _status(f"Loaded {len(runs)} local runs.", "secondary")
+    message = _status(f"已加载 {len(runs)} 条本地实验记录。", "secondary")
     return runs, published_model, index, message
 
 
@@ -339,7 +376,7 @@ def load_local_project(_):
 def sync_local_project(_, runs, published_model):
     index = {"runs": list(runs or []), "published_run_id": published_model.get("run_id") if published_model else None}
     write_project_index(index)
-    return load_project_index(), _status("Project index synchronized.", "success")
+    return load_project_index(), _status("实验索引已同步到本地。", "success")
 
 
 @callback(
@@ -377,14 +414,14 @@ def sync_local_project(_, runs, published_model):
 )
 def train_model(_, active_tab, target, features, impute_strategy, scaler_type, test_size, training_mode, cv_strategy, cv_folds, search_iterations, primary_metric, classifier, regressor, n_est, max_depth, c_val, kernel, lr_c, k_val, reg_n_est, reg_max_depth, alpha, svr_c, run_history):
     if not HAS_SKLEARN:
-        return _status("scikit-learn is not installed.", "danger"), no_update, no_update, no_update, no_update
+        return _status("当前环境未安装 scikit-learn，无法执行训练。", "danger"), no_update, no_update, no_update, no_update
     if active_tab in {"tab-cluster", "tab-ts"}:
-        return _status("Phase 1 keeps clustering and time-series on the basic path. The professional workflow is enabled for classification and regression.", "warning"), no_update, no_update, no_update, no_update
+        return _status("Phase 1 仅把聚类和时间序列保留为基础入口；当前完整工作流只支持分类和回归。", "warning"), no_update, no_update, no_update, no_update
     if not target or not features:
-        return _status("Select one target column and at least one feature column.", "warning"), no_update, no_update, no_update, no_update
+        return _status("请选择 1 个目标列，并至少选择 1 个特征列。", "warning"), no_update, no_update, no_update, no_update
     df = DataManager().active_df
     if df is None or df.empty:
-        return _status("No active dataset available.", "warning"), no_update, no_update, no_update, no_update
+        return _status("当前没有可用数据集，请先加载数据。", "warning"), no_update, no_update, no_update, no_update
     task = _infer_task(active_tab, target)
     algo = classifier if task == "classification" else regressor
     params = _build_classifier_params(algo, n_est, max_depth, c_val, kernel, lr_c, k_val) if task == "classification" else _build_regressor_params(algo, reg_n_est, reg_max_depth, alpha, svr_c)
@@ -402,9 +439,9 @@ def train_model(_, active_tab, target, features, impute_strategy, scaler_type, t
         update_cached_model_context(model, detail, run["run_id"])
         summary = summarize_run_for_index(run)
         new_runs = [summary] + [item for item in (run_history or []) if item.get("run_id") != run["run_id"]]
-        return _status(f"Training finished: {run['algorithm_label']} ({run['training_mode']}).", "success"), detail, "tab-overview", new_runs, load_project_index()
+        return _status(f"训练完成：{run['algorithm_label']}，模式为{_display_training_mode(run['training_mode'])}。", "success"), detail, "tab-overview", new_runs, load_project_index()
     except Exception as exc:
-        return _status(f"Training failed: {exc}", "danger"), no_update, no_update, no_update, no_update
+        return _status(f"训练失败：{exc}", "danger"), no_update, no_update, no_update, no_update
 
 @callback(
     Output("ml-runs-store", "data", allow_duplicate=True),
@@ -428,7 +465,7 @@ def handle_run_actions(_, runs, published_model, current_result):
     run_list = list(runs or [])
     selected = next((item for item in run_list if item.get("run_id") == run_id), None)
     if not selected:
-        return no_update, no_update, no_update, _status("Run not found.", "warning"), no_update, no_update
+        return no_update, no_update, no_update, _status("未找到对应的实验记录。", "warning"), no_update, no_update
 
     if action in {"view", "load", "publish", "save"}:
         detail, model = _load_run_detail(selected)
@@ -436,11 +473,11 @@ def handle_run_actions(_, runs, published_model, current_result):
         detail, model = selected, None
 
     if action in {"view", "load"}:
-        return run_list, published_model, detail, _status(f"Run {action}ed.", "secondary"), load_project_index(), "tab-overview"
+        return run_list, published_model, detail, _status(_action_status_label(action), "secondary"), load_project_index(), "tab-overview"
 
     if action == "publish":
         if model is None:
-            return no_update, no_update, no_update, _status("Unable to load artifact for publishing.", "danger"), no_update, no_update
+            return no_update, no_update, no_update, _status("无法加载实验产物，暂时不能发布模型。", "danger"), no_update, no_update
         update_cached_model_context(model, detail, run_id, published=True)
         publish_cached_run(run_id)
         updated_runs = []
@@ -450,17 +487,17 @@ def handle_run_actions(_, runs, published_model, current_result):
             updated_runs.append(next_item)
         set_published_run_in_index(run_id)
         published_summary = convert_metadata_to_published(detail, detail.get("artifact_path"))
-        return updated_runs, published_summary, detail, _status("Model published for inference.", "success"), load_project_index(), "tab-overview"
+        return updated_runs, published_summary, detail, _status(_action_status_label(action), "success"), load_project_index(), "tab-overview"
 
     if action == "save":
         if selected.get("artifact_path"):
             sync_run_to_project_index(selected)
-            return run_list, published_model, current_result, _status("Run already saved locally.", "secondary"), load_project_index(), no_update
+            return run_list, published_model, current_result, _status("该实验记录已保存在本地。", "secondary"), load_project_index(), no_update
         if model is None:
-            return no_update, no_update, no_update, _status("No in-memory model available to save.", "warning"), no_update, no_update
+            return no_update, no_update, no_update, _status("当前内存中没有可保存的模型。", "warning"), no_update, no_update
         serialize_artifact(detail, model)
         updated_runs = [summarize_run_for_index(detail) if item.get("run_id") == run_id else item for item in run_list]
-        return updated_runs, published_model, detail, _status("Run saved locally.", "success"), load_project_index(), no_update
+        return updated_runs, published_model, detail, _status(_action_status_label(action), "success"), load_project_index(), no_update
 
     if action == "delete":
         project_index = delete_run_artifact(run_id, selected.get("artifact_path"))
@@ -469,7 +506,7 @@ def handle_run_actions(_, runs, published_model, current_result):
         next_result = current_result if not current_result or current_result.get("run_id") != run_id else None
         if next_published is None:
             set_published_run_in_index(None)
-        return updated_runs, next_published, next_result, _status("Run deleted.", "secondary"), project_index, "tab-overview"
+        return updated_runs, next_published, next_result, _status(_action_status_label(action), "secondary"), project_index, "tab-overview"
 
     raise PreventUpdate
 
@@ -478,7 +515,7 @@ def handle_run_actions(_, runs, published_model, current_result):
 def render_runs_panel(runs):
     items = runs or []
     if not items:
-        return empty_placeholder("No experiment runs yet.")
+        return empty_placeholder("还没有实验记录，先完成一次训练。")
     cards = []
     for run in items[:12]:
         primary, secondary = _run_metric_summary(run)
@@ -488,17 +525,17 @@ def render_runs_panel(runs):
                 children=[
                     html.Div([
                         html.Strong(run.get("algorithm_label", run.get("algorithm"))),
-                        dbc.Badge("Published" if run.get("is_published") else run.get("training_mode", "run"), color="success" if run.get("is_published") else "secondary", className="ms-2"),
+                        dbc.Badge("已发布" if run.get("is_published") else _display_training_mode(run.get("training_mode")), color="success" if run.get("is_published") else "secondary", className="ms-2"),
                     ]),
-                    html.Div(f"{run.get('task')} | {run.get('cv_strategy')} | {run.get('created_at', '')[:19]}", className="text-muted small mb-2"),
-                    html.Div(f"Primary: {primary}", className="small"),
+                    html.Div(f"{_display_task(run.get('task'))} | {_display_cv_strategy(run.get('cv_strategy'))} | {run.get('created_at', '')[:19]}", className="text-muted small mb-2"),
+                    html.Div(f"主指标：{primary}", className="small"),
                     html.Div(secondary, className="small text-muted mb-2"),
                     html.Div([
-                        dbc.Button("View", id={"type": "ml-run-action", "action": "view", "run_id": run["run_id"]}, size="sm", color="secondary", outline=True, className="me-1"),
-                        dbc.Button("Load", id={"type": "ml-run-action", "action": "load", "run_id": run["run_id"]}, size="sm", color="secondary", outline=True, className="me-1"),
-                        dbc.Button("Publish", id={"type": "ml-run-action", "action": "publish", "run_id": run["run_id"]}, size="sm", color="primary", className="me-1"),
-                        dbc.Button("Save", id={"type": "ml-run-action", "action": "save", "run_id": run["run_id"]}, size="sm", color="info", outline=True, className="me-1"),
-                        dbc.Button("Delete", id={"type": "ml-run-action", "action": "delete", "run_id": run["run_id"]}, size="sm", color="danger", outline=True),
+                        dbc.Button("查看", id={"type": "ml-run-action", "action": "view", "run_id": run["run_id"]}, size="sm", color="secondary", outline=True, className="me-1"),
+                        dbc.Button("加载", id={"type": "ml-run-action", "action": "load", "run_id": run["run_id"]}, size="sm", color="secondary", outline=True, className="me-1"),
+                        dbc.Button("发布", id={"type": "ml-run-action", "action": "publish", "run_id": run["run_id"]}, size="sm", color="primary", className="me-1"),
+                        dbc.Button("保存", id={"type": "ml-run-action", "action": "save", "run_id": run["run_id"]}, size="sm", color="info", outline=True, className="me-1"),
+                        dbc.Button("删除", id={"type": "ml-run-action", "action": "delete", "run_id": run["run_id"]}, size="sm", color="danger", outline=True),
                     ]),
                 ],
             )
@@ -509,14 +546,14 @@ def render_runs_panel(runs):
 @callback(Output("ml-published-model-panel", "children"), Input("ml-published-model-store", "data"))
 def render_published_panel(published_model):
     if not published_model:
-        return empty_placeholder("Publish a run to enable formal inference.")
+        return empty_placeholder("先发布一个模型，再进入正式预测。")
     return html.Div([
-        html.H6(published_model.get("algorithm_label", "Published Model")),
-        html.Div(f"Task: {published_model.get('task')}", className="small mb-1"),
-        html.Div(f"Primary metric: {published_model.get('primary_metric')} = {_format_metric(published_model.get('best_score'))}", className="small mb-1"),
-        html.Div(f"Target: {published_model.get('target_column')}", className="small mb-1"),
-        html.Div(f"Features: {len(published_model.get('feature_schema', {}).get('all', []))}", className="small mb-2"),
-        html.Div("Best params", className="fw-semibold small"),
+        html.H6(published_model.get("algorithm_label", "已发布模型")),
+        html.Div(f"任务类型：{_display_task(published_model.get('task'))}", className="small mb-1"),
+        html.Div(f"主指标：{_display_metric(published_model.get('primary_metric'))} = {_format_metric(published_model.get('best_score'))}", className="small mb-1"),
+        html.Div(f"目标列：{published_model.get('target_column')}", className="small mb-1"),
+        html.Div(f"特征数：{len(published_model.get('feature_schema', {}).get('all', []))}", className="small mb-2"),
+        html.Div("最佳参数", className="fw-semibold small"),
         html.Pre(json.dumps(published_model.get("best_params", {}), ensure_ascii=False, indent=2), style={"fontSize": "0.75rem", "whiteSpace": "pre-wrap"}),
     ])
 
@@ -524,14 +561,14 @@ def render_published_panel(published_model):
 @callback(Output("ml-kpi-row", "children"), Input("ml-result-store", "data"))
 def render_kpis(run):
     if not run:
-        return [kpi_card("status", "No run", "Train a model to see experiment KPIs", ACCENT_COLORS["blue"], "bi bi-cpu")]
+        return [kpi_card("实验状态", "暂无记录", "完成一次训练后会展示关键指标", ACCENT_COLORS["blue"], "bi bi-cpu")]
     features = run.get("feature_schema", {}).get("all", [])
     snapshot = run.get("dataset_snapshot", {})
     return [
-        kpi_card("Primary Score", _format_metric(run.get("best_score")), run.get("primary_metric", "metric"), ACCENT_COLORS["blue"], "bi bi-trophy"),
-        kpi_card("Training Mode", str(run.get("training_mode", "-")).upper(), run.get("cv_strategy", "-"), ACCENT_COLORS["green"], "bi bi-diagram-3"),
-        kpi_card("Fit Time", _format_metric(run.get("fit_time")), "seconds", ACCENT_COLORS["purple"], "bi bi-stopwatch"),
-        kpi_card("Dataset", str(snapshot.get("rows", 0)), f"rows | {len(features)} features", ACCENT_COLORS["orange"], "bi bi-table"),
+        kpi_card("主指标", _format_metric(run.get("best_score")), _display_metric(run.get("primary_metric")), ACCENT_COLORS["blue"], "bi bi-trophy"),
+        kpi_card("训练模式", _display_training_mode(run.get("training_mode")), _display_cv_strategy(run.get("cv_strategy")), ACCENT_COLORS["green"], "bi bi-diagram-3"),
+        kpi_card("训练耗时", _format_metric(run.get("fit_time")), "秒", ACCENT_COLORS["purple"], "bi bi-stopwatch"),
+        kpi_card("数据集", str(snapshot.get("rows", 0)), f"{len(features)} 个特征", ACCENT_COLORS["orange"], "bi bi-table"),
     ]
 
 
@@ -539,7 +576,7 @@ def render_kpis(run):
 def render_tab_content(active_tab, run, published_model):
     if active_tab == "tab-predict":
         if not published_model:
-            return dbc.Alert("Publish a model before using prediction.", color="warning")
+            return dbc.Alert("请先发布模型，再进入预测。", color="warning")
         return _prediction_form(published_model)
     if not run:
         return empty_placeholder()
@@ -566,7 +603,7 @@ def predict_single_sample(_, values, ids, published_model):
             record[feature] = value
     input_df = pd.DataFrame([record], columns=feature_schema.get("all", []))
     prediction = model.predict(input_df)[0]
-    blocks = [html.Div(f"Prediction: {prediction}", className="fw-semibold")]
+    blocks = [html.Div(f"预测结果：{prediction}", className="fw-semibold")]
     if hasattr(model, "predict_proba") and published_model.get("task") == "classification":
         proba = model.predict_proba(input_df)[0]
         classes = getattr(model.named_steps["model"], "classes_", None)
@@ -584,16 +621,16 @@ def predict_batch(_, prediction_col, published_model):
     dm = DataManager()
     df = dm.active_df
     if df is None or df.empty:
-        return _status("No active dataset available for batch prediction.", "warning")
+        return _status("当前没有可用于批量预测的数据集。", "warning")
     required = published_model.get("feature_schema", {}).get("all", [])
     missing = [column for column in required if column not in df.columns]
     if missing:
-        return _status(f"Missing required columns: {', '.join(missing)}", "danger")
+        return _status(f"缺少模型所需列：{', '.join(missing)}", "danger")
     result_df = df.copy()
-    column_name = prediction_col or "prediction"
+    column_name = prediction_col or "预测结果"
     result_df[column_name] = model.predict(result_df[required])
     dm.update_active_dataset(result_df, snapshot=True)
-    return _status(f"Predictions written to active dataset column '{column_name}'.", "success")
+    return _status(f"预测结果已写回当前数据集的“{column_name}”列。", "success")
 
 
 @callback(

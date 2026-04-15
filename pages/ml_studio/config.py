@@ -73,23 +73,23 @@ PRIMARY_METRIC_OPTIONS = {
 }
 
 ALGORITHM_LABELS = {
-    "rf_clf": "Random Forest",
-    "gbm_clf": "Gradient Boosting",
-    "svm_clf": "Support Vector Machine",
-    "lr_clf": "Logistic Regression",
-    "knn_clf": "KNN",
-    "dt_clf": "Decision Tree",
-    "rf_reg": "Random Forest Regressor",
-    "gbm_reg": "Gradient Boosting Regressor",
-    "lr_reg": "Linear Regression",
-    "ridge_reg": "Ridge Regression",
-    "svr_reg": "SVR",
-    "kmeans": "K-Means",
+    "rf_clf": "随机森林 Random Forest",
+    "gbm_clf": "梯度提升 Gradient Boosting",
+    "svm_clf": "支持向量机 SVM",
+    "lr_clf": "逻辑回归 Logistic Regression",
+    "knn_clf": "K 近邻 KNN",
+    "dt_clf": "决策树 Decision Tree",
+    "rf_reg": "随机森林回归 Random Forest",
+    "gbm_reg": "梯度提升回归 Gradient Boosting",
+    "lr_reg": "线性回归 Linear Regression",
+    "ridge_reg": "岭回归 Ridge Regression",
+    "svr_reg": "支持向量回归 SVR",
+    "kmeans": "K-Means 聚类",
     "dbscan": "DBSCAN",
-    "agg": "Agglomerative",
-    "ts_linear": "Linear Trend",
-    "ts_rf": "Random Forest Forecaster",
-    "ts_arima": "AR-like Baseline",
+    "agg": "层次聚类 Agglomerative",
+    "ts_linear": "线性趋势基线",
+    "ts_rf": "随机森林时序基线",
+    "ts_arima": "AR-like 基线",
 }
 
 TASK_LABELS = {
@@ -102,6 +102,29 @@ TASK_LABELS = {
 DEFAULT_PRIMARY_METRIC = {
     "classification": "f1_weighted",
     "regression": "rmse",
+}
+
+TRAINING_MODE_LABELS = {
+    "quick": "快速训练",
+    "cv": "交叉验证",
+    "random_search": "随机搜索",
+}
+
+CV_STRATEGY_LABELS = {
+    "holdout": "留出验证",
+    "kfold": "K 折交叉验证",
+    "stratified_kfold": "分层 K 折交叉验证",
+}
+
+METRIC_LABELS = {
+    "f1_weighted": "F1 加权",
+    "accuracy": "准确率",
+    "precision_weighted": "精确率加权",
+    "recall_weighted": "召回率加权",
+    "rmse": "RMSE",
+    "mae": "MAE",
+    "r2": "R2",
+    "mape": "MAPE",
 }
 
 WORKFLOW_GUIDE_STEPS = [
