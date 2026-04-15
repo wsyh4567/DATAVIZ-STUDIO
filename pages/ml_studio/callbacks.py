@@ -14,8 +14,8 @@ from dash import ALL, Input, Output, State, callback, ctx, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 
 from core.data_manager import DataManager
-from .components import empty_placeholder, kpi_card
-from .config import ACCENT_COLORS, CV_STRATEGY_OPTIONS, DEFAULT_PRIMARY_METRIC, HAS_SKLEARN, PRIMARY_METRIC_OPTIONS, TASK_LABELS
+from .components import algorithm_guide_card, empty_placeholder, kpi_card, workflow_hint_card
+from .config import ALGORITHM_GUIDANCE, ACCENT_COLORS, CV_STRATEGY_OPTIONS, DEFAULT_PRIMARY_METRIC, HAS_SKLEARN, PRIMARY_METRIC_OPTIONS, TASK_LABELS
 from .model_utils import (
     convert_metadata_to_published,
     delete_run_artifact,
@@ -126,6 +126,35 @@ def _published_summary(published_model: dict[str, Any] | None):
     return convert_metadata_to_published(published_model, published_model.get("artifact_path"))
 
 
+def _resolve_algorithm_guide(active_tab: str, classifier: str | None, regressor: str | None, cluster_algo: str | None, ts_algo: str | None) -> dict[str, Any]:
+    if active_tab == "tab-reg":
+        return ALGORITHM_GUIDANCE["regression"].get(regressor or "rf_reg", ALGORITHM_GUIDANCE["regression"]["rf_reg"])
+    if active_tab == "tab-cluster":
+        return ALGORITHM_GUIDANCE["clustering"].get(cluster_algo or "kmeans", ALGORITHM_GUIDANCE["clustering"]["kmeans"])
+    if active_tab == "tab-ts":
+        return ALGORITHM_GUIDANCE["timeseries"].get(ts_algo or "ts_linear", ALGORITHM_GUIDANCE["timeseries"]["ts_linear"])
+    return ALGORITHM_GUIDANCE["classification"].get(classifier or "rf_clf", ALGORITHM_GUIDANCE["classification"]["rf_clf"])
+
+
+def _workflow_next_step(active_tab: str, target: str | None, features: list[str] | None, run: dict[str, Any] | None, published_model: dict[str, Any] | None) -> html.Div:
+    if active_tab in {"tab-cluster", "tab-ts"}:
+        label = "聚类" if active_tab == "tab-cluster" else "时间序列"
+        return workflow_hint_card(
+            "当前阶段说明",
+            f"{label}仍处于基础模式。若你要稳定交付，请优先使用分类或回归工作流。",
+            color="secondary",
+        )
+    if not target:
+        return workflow_hint_card("下一步建议", "先选目标列，系统会据此判断任务类型并刷新主指标建议。", color="primary")
+    if not features:
+        return workflow_hint_card("下一步建议", "目标列选好后，再补充至少一个特征列；优先选择和目标最相关的字段。", color="primary")
+    if not run:
+        return workflow_hint_card("下一步建议", "当前已经可以训练。第一次建议用“快速训练”，先确认流程和结果是否合理。", color="success")
+    if not published_model:
+        return workflow_hint_card("训练后建议", "先查看总览和特征重要性；确认结果可靠后，再发布模型进入预测环节。", color="info")
+    return workflow_hint_card("模型已就绪", "当前模型已经发布，可以去“预测”页签做单样本或整表预测。", color="success")
+
+
 def _prediction_form(published_model: dict[str, Any]) -> html.Div:
     schema = published_model.get("feature_schema", {})
     numeric = set(schema.get("numeric", []))
@@ -144,12 +173,12 @@ def _prediction_form(published_model: dict[str, Any]) -> html.Div:
         )
     return html.Div([
         dbc.Row(inputs, className="g-2"),
-        dbc.Button("Predict Single Sample", id="btn-ml-single-predict", color="primary", className="me-2"),
+        dbc.Button("预测单条样本", id="btn-ml-single-predict", color="primary", className="me-2"),
         html.Div(id="ml-single-predict-output", className="mt-3"),
         html.Hr(),
-        html.H6("Batch Prediction"),
-        dbc.Input(id="ml-batch-pred-col", placeholder="Prediction column name", value="prediction", className="mb-2"),
-        dbc.Button("Predict Active Dataset", id="btn-ml-batch-predict", color="secondary"),
+        html.H6("批量预测"),
+        dbc.Input(id="ml-batch-pred-col", placeholder="预测结果列名", value="prediction", className="mb-2"),
+        dbc.Button("写回当前数据集", id="btn-ml-batch-predict", color="secondary"),
         html.Div(id="ml-batch-predict-output", className="mt-3"),
     ])
 
@@ -221,21 +250,45 @@ def toggle_tutorial(_, is_open):
 def update_workflow_controls(target, active_tab, current_metric, current_cv):
     task = _infer_task(active_tab, target)
     if task == "classification":
-        badge = dbc.Badge("Classification workflow", color="primary")
+        badge = dbc.Badge("分类任务：预测离散类别", color="primary")
         metric_options = PRIMARY_METRIC_OPTIONS["classification"]
         cv_options = CV_STRATEGY_OPTIONS
         metric_value = current_metric if current_metric in {item["value"] for item in metric_options} else DEFAULT_PRIMARY_METRIC["classification"]
         cv_value = current_cv if current_cv in {item["value"] for item in cv_options} else "holdout"
         return badge, metric_options, metric_value, cv_options, cv_value
     if task == "regression":
-        badge = dbc.Badge("Regression workflow", color="success")
+        badge = dbc.Badge("回归任务：预测连续数值", color="success")
         metric_options = PRIMARY_METRIC_OPTIONS["regression"]
         cv_options = [item for item in CV_STRATEGY_OPTIONS if item["value"] != "stratified_kfold"]
         metric_value = current_metric if current_metric in {item["value"] for item in metric_options} else DEFAULT_PRIMARY_METRIC["regression"]
         cv_value = current_cv if current_cv in {item["value"] for item in cv_options} else "holdout"
         return badge, metric_options, metric_value, cv_options, cv_value
-    label = TASK_LABELS.get(task, "Select a target") if task else "Select a target"
+    label = TASK_LABELS.get(task, "请选择目标列") if task else "请选择目标列"
     return dbc.Badge(label, color="secondary"), no_update, no_update, no_update, no_update
+
+
+@callback(
+    Output("ml-workflow-hint", "children"),
+    Input("ml-algo-tabs", "active_tab"),
+    Input("ml-target-var", "value"),
+    Input("ml-feature-vars", "value"),
+    Input("ml-result-store", "data"),
+    Input("ml-published-model-store", "data"),
+)
+def render_workflow_hint(active_tab, target, features, run, published_model):
+    return _workflow_next_step(active_tab, target, features, run, published_model)
+
+
+@callback(
+    Output("ml-algo-guidance", "children"),
+    Input("ml-algo-tabs", "active_tab"),
+    Input("ml-classifier", "value"),
+    Input("ml-regressor", "value"),
+    Input("ml-cluster-algo", "value"),
+    Input("ml-ts-algo", "value"),
+)
+def render_algorithm_guidance(active_tab, classifier, regressor, cluster_algo, ts_algo):
+    return algorithm_guide_card(_resolve_algorithm_guide(active_tab, classifier, regressor, cluster_algo, ts_algo))
 
 
 @callback(Output("ml-predict-tab", "disabled"), Input("ml-published-model-store", "data"), Input("ml-algo-tabs", "active_tab"))

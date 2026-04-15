@@ -50,12 +50,46 @@ def empty_placeholder(msg: str = "请先训练模型") -> html.Div:
         ]
     )
 
+
+def workflow_hint_card(title: str, message: str, color: str = "info") -> html.Div:
+    return dbc.Alert(
+        [
+            html.Div(title, className="fw-semibold mb-1"),
+            html.Div(message, style={"fontSize": "0.85rem", "lineHeight": "1.6"}),
+        ],
+        color=color,
+        className="mb-0",
+        style={"borderRadius": "10px"},
+    )
+
+
+def algorithm_guide_card(guide: dict) -> html.Div:
+    return html.Div(
+        style={
+            "border": "1px solid var(--border)",
+            "borderRadius": "10px",
+            "padding": "14px",
+            "backgroundColor": "var(--bg-primary)",
+        },
+        children=[
+            html.Div("算法说明", className="small fw-semibold mb-1", style={"color": ACCENT_COLORS["blue"]}),
+            html.H6(guide["title"], className="mb-2"),
+            html.Div(guide["summary"], style={"fontSize": "0.85rem", "color": "var(--text-secondary)", "lineHeight": "1.6"}),
+            html.Div("适合场景", className="small fw-semibold mt-3 mb-1"),
+            html.Ul([html.Li(item) for item in guide["best_for"]], className="small mb-2", style={"paddingLeft": "18px"}),
+            html.Div("注意点", className="small fw-semibold mb-1"),
+            html.Ul([html.Li(item) for item in guide["watchouts"]], className="small mb-2", style={"paddingLeft": "18px"}),
+            html.Div(f"建议：{guide['recommendation']}", style={"fontSize": "0.82rem", "color": "var(--text-muted)", "lineHeight": "1.6"}),
+        ],
+    )
+
+
 def tutorial_offcanvas():
     """新手教程左侧抽屉"""
     content = html.Div([
         html.P("欢迎来到机器学习工作室！在这里你可以让计算机从数据中发现规律。", style={"color": "var(--text-secondary)", "fontSize": "0.9rem"}),
         
-        html.H6("📘 基础概念速成", className="mt-4 mb-2"),
+        html.H6("基础概念速成", className="mt-4 mb-2"),
         dbc.Accordion([
             dbc.AccordionItem(title="1. 什么是目标变量?", children=[
                 html.P("目标变量（Y）就是你想要预测的东西。比如预测房价，房价就是目标；预测病人是否患病，是否患病就是目标。")
@@ -70,7 +104,7 @@ def tutorial_offcanvas():
             ]),
         ], start_collapsed=True),
 
-        html.H6("🛠️ 如何操作?", className="mt-4 mb-2"),
+        html.H6("如何操作?", className="mt-4 mb-2"),
         html.Ol([
             html.Li("在左侧【数据预处理】设定缺失值和标准化策略。"),
             html.Li("在【特征与目标】选择你要预测什么（目标Y），以及根据什么预测（特征X）。"),
@@ -83,7 +117,7 @@ def tutorial_offcanvas():
     return dbc.Offcanvas(
         content,
         id="ml-tutorial-offcanvas",
-        title="🤖 机器学习新手教程",
+        title="机器学习新手教程",
         is_open=False,
         placement="end",
         style={"backgroundColor": "var(--bg-primary)", "color": "var(--text-primary)"}

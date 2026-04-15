@@ -8,9 +8,10 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 
 from core.data_manager import DataManager
-from .components import empty_placeholder, tutorial_offcanvas
+from .components import algorithm_guide_card, empty_placeholder, tutorial_offcanvas, workflow_hint_card
 from .config import (
     ACCENT_COLORS,
+    ALGORITHM_GUIDANCE,
     CARD_STYLE,
     CLASSIFIER_OPTIONS,
     CLUSTER_OPTIONS,
@@ -19,6 +20,7 @@ from .config import (
     PRIMARY_METRIC_OPTIONS,
     REGRESSOR_OPTIONS,
     TRAINING_MODE_OPTIONS,
+    WORKFLOW_GUIDE_STEPS,
 )
 
 
@@ -81,9 +83,9 @@ def _page_header(df: pd.DataFrame) -> html.Div:
                             "WebkitBackgroundClip": "text",
                             "WebkitTextFillColor": "transparent",
                         }),
-                        html.Span("Professional training workflow for local model delivery", style={"fontSize": "0.75rem", "color": "var(--text-secondary)"}),
+                        html.Span("面向本地表格数据的引导式建模工作台", style={"fontSize": "0.75rem", "color": "var(--text-secondary)"}),
                     ]),
-                    dbc.Button([html.I(className="bi bi-book me-2"), "Guide"], id="btn-ml-tutorial", color="info", outline=True, size="sm"),
+                    dbc.Button([html.I(className="bi bi-book me-2"), "新手指引"], id="btn-ml-tutorial", color="info", outline=True, size="sm"),
                 ],
             ),
             html.Div(
@@ -91,8 +93,8 @@ def _page_header(df: pd.DataFrame) -> html.Div:
                 children=[
                     _header_pill(f"{len(df):,} rows", "bi-table", ACCENT_COLORS["blue"]),
                     _header_pill(f"{len(df.columns)} columns", "bi-layout-three-columns", ACCENT_COLORS["green"]),
-                    dbc.Button([html.I(className="bi bi-folder2-open me-1"), "Reload Local Runs"], id="btn-ml-load-project", color="secondary", outline=True, size="sm"),
-                    dbc.Button([html.I(className="bi bi-cloud-arrow-up me-1"), "Sync Index"], id="btn-ml-save-project", color="primary", outline=True, size="sm"),
+                    dbc.Button([html.I(className="bi bi-folder2-open me-1"), "加载本地实验"], id="btn-ml-load-project", color="secondary", outline=True, size="sm"),
+                    dbc.Button([html.I(className="bi bi-cloud-arrow-up me-1"), "同步实验索引"], id="btn-ml-save-project", color="primary", outline=True, size="sm"),
                 ],
             ),
         ],
@@ -115,6 +117,61 @@ def _header_pill(text: str, icon: str, color: str) -> html.Div:
     )
 
 
+def _journey_card() -> html.Div:
+    step_blocks = []
+    for step in WORKFLOW_GUIDE_STEPS:
+        step_blocks.append(
+            html.Div(
+                style={
+                    "display": "grid",
+                    "gridTemplateColumns": "32px 1fr",
+                    "gap": "10px",
+                    "alignItems": "start",
+                    "marginBottom": "12px",
+                },
+                children=[
+                    html.Div(
+                        step["id"],
+                        style={
+                            "width": "32px",
+                            "height": "32px",
+                            "borderRadius": "50%",
+                            "display": "flex",
+                            "alignItems": "center",
+                            "justifyContent": "center",
+                            "backgroundColor": f"{ACCENT_COLORS['blue']}18",
+                            "color": ACCENT_COLORS["blue"],
+                            "fontWeight": "700",
+                            "fontSize": "0.82rem",
+                        },
+                    ),
+                    html.Div(
+                        [
+                            html.Div(step["title"], className="fw-semibold", style={"fontSize": "0.9rem"}),
+                            html.Div(step["description"], style={"fontSize": "0.82rem", "color": "var(--text-secondary)", "lineHeight": "1.6"}),
+                        ]
+                    ),
+                ],
+            )
+        )
+    return html.Div(
+        style=CARD_STYLE,
+        children=[
+            html.Div("三步完成一次训练", className="fw-semibold mb-1"),
+            html.Div("Phase 1 重点保障分类和回归；聚类与时间序列保留基础入口。", style={"fontSize": "0.82rem", "color": "var(--text-secondary)", "lineHeight": "1.6"}),
+            html.Div(step_blocks, className="mt-3"),
+            html.Div(
+                id="ml-workflow-hint",
+                children=workflow_hint_card(
+                    "下一步建议",
+                    "先在下方选择目标列与特征列，系统会自动判断这是分类还是回归任务。",
+                    color="primary",
+                ),
+            ),
+        ],
+    )
+
+
 def _left_sidebar(columns: list[dict[str, str]], numeric_columns: list[dict[str, str]]) -> html.Div:
     return html.Div(
         style={
@@ -129,12 +186,13 @@ def _left_sidebar(columns: list[dict[str, str]], numeric_columns: list[dict[str,
             "gap": "12px",
         },
         children=[
+            _journey_card(),
             _data_card(),
             _feature_card(columns),
             _workflow_card(),
             _algorithm_card(columns, numeric_columns),
             dbc.Button(
-                [html.I(className="bi bi-play-circle-fill me-2"), "Run Training"],
+                [html.I(className="bi bi-play-circle-fill me-2"), "开始训练"],
                 id="btn-ml-train",
                 color="primary",
                 className="w-100 fw-bold",
@@ -149,33 +207,33 @@ def _data_card() -> html.Div:
     return html.Div(
         style=CARD_STYLE,
         children=[
-            html.H6("Preprocessing", className="mb-3"),
-            html.Label("Missing values", className="form-label small"),
+            html.H6("数据预处理", className="mb-3"),
+            html.Label("缺失值处理", className="form-label small"),
             dcc.Dropdown(
                 id="ml-impute-strategy",
                 options=[
-                    {"label": "Mean", "value": "mean"},
-                    {"label": "Median", "value": "median"},
-                    {"label": "Most frequent", "value": "most_frequent"},
-                    {"label": "Drop incomplete rows", "value": "drop"},
+                    {"label": "均值填补", "value": "mean"},
+                    {"label": "中位数填补", "value": "median"},
+                    {"label": "众数填补", "value": "most_frequent"},
+                    {"label": "删除缺失行", "value": "drop"},
                 ],
                 value="mean",
                 clearable=False,
                 className="mb-3",
             ),
-            html.Label("Scaling", className="form-label small"),
+            html.Label("数值缩放", className="form-label small"),
             dcc.Dropdown(
                 id="ml-scaler",
                 options=[
-                    {"label": "None", "value": "none"},
-                    {"label": "StandardScaler", "value": "standard"},
-                    {"label": "MinMaxScaler", "value": "minmax"},
+                    {"label": "不缩放", "value": "none"},
+                    {"label": "标准化 StandardScaler", "value": "standard"},
+                    {"label": "归一化 MinMaxScaler", "value": "minmax"},
                 ],
                 value="standard",
                 clearable=False,
                 className="mb-3",
             ),
-            html.Label("Holdout test size", className="form-label small"),
+            html.Label("留出测试集比例", className="form-label small"),
             dcc.Slider(id="ml-test-size", min=0.1, max=0.4, step=0.05, value=0.2, marks={0.1: "10%", 0.2: "20%", 0.3: "30%", 0.4: "40%"}),
         ],
     )
@@ -185,12 +243,12 @@ def _feature_card(columns: list[dict[str, str]]) -> html.Div:
     return html.Div(
         style=CARD_STYLE,
         children=[
-            html.H6("Features & Target", className="mb-3"),
-            html.Label("Target (Y)", className="form-label small"),
-            dcc.Dropdown(id="ml-target-var", options=columns, placeholder="Select target column", className="mb-2"),
+            html.H6("特征与目标", className="mb-3"),
+            html.Label("目标列（Y）", className="form-label small"),
+            dcc.Dropdown(id="ml-target-var", options=columns, placeholder="选择你要预测的列", className="mb-2"),
             html.Div(id="ml-task-type-badge", className="mb-3", style={"minHeight": "24px"}),
-            html.Label("Features (X)", className="form-label small"),
-            dcc.Dropdown(id="ml-feature-vars", options=columns, multi=True, placeholder="Select feature columns"),
+            html.Label("特征列（X）", className="form-label small"),
+            dcc.Dropdown(id="ml-feature-vars", options=columns, multi=True, placeholder="选择用于预测的列，通常 2-8 列更容易解释"),
         ],
     )
 
@@ -199,16 +257,16 @@ def _workflow_card() -> html.Div:
     return html.Div(
         style=CARD_STYLE,
         children=[
-            html.H6("Workflow", className="mb-3"),
-            html.Label("Training mode", className="form-label small"),
+            html.H6("训练策略", className="mb-3"),
+            html.Label("训练模式", className="form-label small"),
             dcc.Dropdown(id="ml-training-mode", options=TRAINING_MODE_OPTIONS, value="quick", clearable=False, className="mb-3"),
-            html.Label("Validation strategy", className="form-label small"),
+            html.Label("验证方式", className="form-label small"),
             dcc.Dropdown(id="ml-cv-strategy", options=CV_STRATEGY_OPTIONS, value="holdout", clearable=False, className="mb-3"),
-            html.Label("CV folds", className="form-label small"),
+            html.Label("交叉验证折数", className="form-label small"),
             dcc.Input(id="ml-cv-folds", type="number", value=5, min=2, className="form-control form-control-sm mb-3"),
-            html.Label("Random search iterations", className="form-label small"),
+            html.Label("随机搜索轮数", className="form-label small"),
             dcc.Input(id="ml-search-iterations", type="number", value=10, min=1, className="form-control form-control-sm mb-3"),
-            html.Label("Primary metric", className="form-label small"),
+            html.Label("主指标", className="form-label small"),
             dcc.Dropdown(id="ml-primary-metric", options=PRIMARY_METRIC_OPTIONS["classification"], value="f1_weighted", clearable=False),
         ],
     )
@@ -218,15 +276,15 @@ def _algorithm_card(columns: list[dict[str, str]], numeric_columns: list[dict[st
     return html.Div(
         style=CARD_STYLE,
         children=[
-            html.H6("Algorithm", className="mb-3"),
+            html.H6("算法与适用场景", className="mb-3"),
             dbc.Tabs(
                 id="ml-algo-tabs",
                 active_tab="tab-clf",
                 children=[
-                    dbc.Tab(label="Classification", tab_id="tab-clf"),
-                    dbc.Tab(label="Regression", tab_id="tab-reg"),
-                    dbc.Tab(label="Clustering (Basic)", tab_id="tab-cluster"),
-                    dbc.Tab(label="Time Series (Basic)", tab_id="tab-ts"),
+                    dbc.Tab(label="分类", tab_id="tab-clf"),
+                    dbc.Tab(label="回归", tab_id="tab-reg"),
+                    dbc.Tab(label="聚类（基础）", tab_id="tab-cluster"),
+                    dbc.Tab(label="时间序列（基础）", tab_id="tab-ts"),
                 ],
                 className="mb-3",
             ),
@@ -247,29 +305,30 @@ def _algorithm_card(columns: list[dict[str, str]], numeric_columns: list[dict[st
                 dcc.Input(id="param-svr-c", type="number", value=1.0, step=0.1, className="form-control form-control-sm mb-2", placeholder="SVR C"),
             ]),
             html.Div(id="ml-cluster-panel", style={"display": "none"}, children=[
-                dbc.Alert("Clustering stays on the legacy basic flow in phase 1.", color="secondary", className="mb-2"),
+                dbc.Alert("Phase 1 仍只保留基础聚类入口，暂不纳入完整专业流程。", color="secondary", className="mb-2"),
                 dcc.Dropdown(id="ml-cluster-algo", options=CLUSTER_OPTIONS, value="kmeans", clearable=False, className="mb-2"),
                 dcc.Input(id="param-n-clusters", type="number", value=3, min=2, className="form-control form-control-sm mb-2"),
                 dcc.Input(id="param-eps", type="number", value=0.5, step=0.1, className="form-control form-control-sm mb-2"),
             ]),
             html.Div(id="ml-ts-panel", style={"display": "none"}, children=[
-                dbc.Alert("Time series stays on the legacy basic flow in phase 1.", color="secondary", className="mb-2"),
+                dbc.Alert("Phase 1 仍只保留基础时间序列入口，暂不做复杂时序建模引导。", color="secondary", className="mb-2"),
                 dcc.Dropdown(
                     id="ml-ts-algo",
                     options=[
-                        {"label": "Linear Trend", "value": "ts_linear"},
-                        {"label": "Random Forest Forecaster", "value": "ts_rf"},
-                        {"label": "AR-like Baseline", "value": "ts_arima"},
+                        {"label": "线性趋势基线", "value": "ts_linear"},
+                        {"label": "随机森林时序基线", "value": "ts_rf"},
+                        {"label": "AR-like 基线", "value": "ts_arima"},
                     ],
                     value="ts_linear",
                     clearable=False,
                     className="mb-2",
                 ),
-                dcc.Dropdown(id="param-ts-timecol", options=columns, placeholder="Select time column", className="mb-2"),
-                dcc.Dropdown(id="param-ts-targetcol", options=numeric_columns, placeholder="Select numeric target", className="mb-2"),
+                dcc.Dropdown(id="param-ts-timecol", options=columns, placeholder="选择时间列", className="mb-2"),
+                dcc.Dropdown(id="param-ts-targetcol", options=numeric_columns, placeholder="选择数值目标列", className="mb-2"),
                 dcc.Input(id="param-ts-horizon", type="number", value=10, min=1, className="form-control form-control-sm mb-2"),
                 dcc.Slider(id="param-ts-ci", min=50, max=99, step=1, value=95, marks={80: "80", 90: "90", 95: "95", 99: "99"}),
             ]),
+            html.Div(id="ml-algo-guidance", className="mt-3", children=algorithm_guide_card(ALGORITHM_GUIDANCE["classification"]["rf_clf"])),
         ],
     )
 
@@ -290,10 +349,10 @@ def _right_panel() -> html.Div:
                         id="ml-eval-tabs",
                         active_tab="tab-overview",
                         children=[
-                            dbc.Tab(label="Overview", tab_id="tab-overview"),
-                            dbc.Tab(label="Feature Importance", tab_id="tab-feature"),
-                            dbc.Tab(label="Detailed Report", tab_id="tab-report"),
-                            dbc.Tab(label="Prediction", tab_id="tab-predict", id="ml-predict-tab"),
+                            dbc.Tab(label="总览", tab_id="tab-overview"),
+                            dbc.Tab(label="特征重要性", tab_id="tab-feature"),
+                            dbc.Tab(label="详细报告", tab_id="tab-report"),
+                            dbc.Tab(label="预测", tab_id="tab-predict", id="ml-predict-tab"),
                         ],
                     ),
                     html.Div(id="ml-tab-content", style={"marginTop": "16px", "flex": "1", "overflowY": "auto"}, children=[empty_placeholder()]),
@@ -308,8 +367,8 @@ def _no_sklearn_view() -> html.Div:
         className="d-flex flex-column align-items-center justify-content-center h-100",
         children=[
             html.I(className="bi bi-x-octagon", style={"fontSize": "4rem", "color": "var(--error)", "marginBottom": "20px"}),
-            html.H4("Missing required dependency: scikit-learn"),
-            html.P("Install the ML dependencies to use this page."),
+            html.H4("缺少必需依赖：scikit-learn"),
+            html.P("安装机器学习依赖后才能使用 ML Studio。"),
             html.Code("pip install scikit-learn scipy joblib", style={"backgroundColor": "var(--bg-secondary)", "padding": "10px", "borderRadius": "8px", "fontSize": "1.1rem"}),
         ],
     )
@@ -319,8 +378,8 @@ def _no_data_view() -> html.Div:
     return html.Div(
         className="dvs-empty",
         children=[
-            html.Div("No data", className="dvs-empty__icon"),
-            html.Div("Load a dataset before using ML Studio", className="dvs-empty__text"),
-            html.Div("Go to Data Hub or Home and load a dataset first.", style={"color": "var(--text-muted)", "fontSize": "var(--text-sm)"}),
+            html.Div("暂无数据", className="dvs-empty__icon"),
+            html.Div("使用 ML Studio 前请先加载数据集", className="dvs-empty__text"),
+            html.Div("先去 Data Hub 或首页加载一份数据，再回来建模。", style={"color": "var(--text-muted)", "fontSize": "var(--text-sm)"}),
         ],
     )
